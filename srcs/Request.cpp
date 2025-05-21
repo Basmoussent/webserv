@@ -1,0 +1,199 @@
+#include "Request.hpp"
+#include "stdio.h"
+
+Request::Request() : _isValid(false)
+{
+
+}
+
+Request::Request(const std::string& raw_request) : _isValid(false)
+{
+	parseRequest(raw_request);
+}
+
+Request::Request(const Request& other)
+{
+	*this = other;
+}
+
+Request::~Request()
+{
+
+}
+Request& Request::operator=(const Request& other)
+{
+	if (this != &other)
+	{
+		_method = other._method;
+		_uri = other._uri;
+		_httpVersion = other._httpVersion;
+		_headers = other._headers;
+		_body = other._body;
+		_isValid = other._isValid;
+	}
+	return *this;
+}
+
+// Setters
+void Request::setMethod(const std::string method)
+{
+	_method = method;
+
+}
+
+void Request::setUri(const std::string uri)
+{
+	_uri = uri;
+}
+
+void Request::setHttpVersion(const std::string httpVersion)
+{
+	_httpVersion = httpVersion;
+}
+
+void Request::setHeader(const std::string key, const std::string value)
+{
+	_headers[key] = value;
+}
+
+void Request::setBody(const std::string body)
+{
+	_body += body;
+}
+
+void Request::setValid(bool isValid)
+{
+	_isValid = isValid;
+}
+
+// Getters
+const std::string& Request::getMethod() const
+{
+	return _method;
+}
+
+const std::string& Request::getUri() const
+{
+	return _uri;
+}
+
+const std::string& Request::getHttpVersion() const
+{
+	return _httpVersion;
+}
+
+const std::string& Request::getHeader(const std::string& key) const
+{
+    std::map<std::string, std::string>::const_iterator it = _headers.find(key);
+    if (it != _headers.end())
+        return it->second;
+    static const std::string empty_string;
+    return empty_string;
+}
+
+const std::map<std::string, std::string> Request::getFullHeader() const
+{
+	return _headers;
+}
+
+const std::string& Request::getBody() const
+{
+	return _body;
+}
+
+bool Request::isValid() const
+{
+	return _isValid;
+}
+
+void Request::parseRequest(const std::string raw_request)
+{
+	std::istringstream request_stream(raw_request);
+	// getLine works with string_stream so we can't pass the raw string to it
+	std::string request_line;
+	std::string header_line; 
+	std::string headers_section;
+	std::string body_section;
+
+	if (std::getline(request_stream, request_line) && !request_line.empty())
+	{
+		parseRequestLine(request_line);
+	}
+	while (std::getline(request_stream, header_line))
+	{
+		if (header_line == "\r" || header_line.empty())
+			break ;
+		headers_section+=header_line; 
+		headers_section += "\n";
+	}
+	parseBody(request_stream, body_section);
+	parseHeaders(headers_section);
+}
+
+void Request::parseBody(std::istringstream &request_stream, std::string &body_section)
+{
+	while (std::getline(request_stream, body_section))
+	{
+		if (body_section.empty())
+			break ;
+		setBody(body_section);
+		setBody("\n");
+	}
+}
+void Request::parseRequestLine(const std::string request_line)
+{
+	std::istringstream line_stream(request_line);
+	std::string method;
+	std::string uri;
+	std::string http_version;
+
+	if (line_stream >> method >> uri >> http_version)
+	{
+		setMethod(method);
+		setUri(uri);
+		setHttpVersion(http_version);
+		setValid(true);
+	}
+	else
+	{
+		setValid(false);
+	}
+}
+
+void Request::parseHeaders(std::string header)
+{
+	std::istringstream header_stream(header);
+	std::string line;
+
+	while (std::getline(header_stream, line))
+	{
+		std::size_t pos = line.find(':');
+		if (pos != std::string::npos)
+		{
+			std::string key = line.substr(0, pos);
+			std::string value = line.substr(pos + 1);
+			setHeader(key, value);
+		}
+	}
+}
+
+std::ostream& operator<<(std::ostream& os, const Request& request)
+{
+	os << "Method: " << request.getMethod() << "\n";
+	os << "URI: " << request.getUri() << "\n";
+	os << "HTTP Version: " << request.getHttpVersion() << "\n";
+	os << "Headers:\n";
+
+	std::map<std::string, std::string> headers = request.getFullHeader();
+	std::map<std::string, std::string>::const_iterator it;
+	for (it = headers.begin(); it != headers.end(); ++it)
+	{
+		os << it->first << ": " << it->second << "\n";
+	}
+	os << "Body: \n" << request.getBody();
+	return os;
+}
+
+
+// check request type
+// Verifier le HOST car obligatoire

@@ -4,6 +4,8 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <sstream>
+#include <iostream>
 
 class Request {
 private:
@@ -26,16 +28,30 @@ public:
     const std::string&  getUri() const;
     const std::string&  getHttpVersion() const;
     const std::string&  getHeader(const std::string& key) const;
+    const std::map<std::string, std::string>  getFullHeader() const;
     const std::string&  getBody() const;
     bool                isValid() const;
 
-    void parseRequest(const std::string& raw_request);
-    void parseRequestLine(const std::string& request_line);
-    void parseHeaders(const std::string& headers_section);
-    void parseBody(const std::string& body_section);
+    // Setters
+    void setMethod(const std::string method);
+    void setUri(const std::string uri);
+    void setHttpVersion(const std::string httpVersion);
+    void setHeader(const std::string key, const std::string value);
+    void setBody(const std::string body);
+    void setValid(bool isValid);
+
+    // Parsers
+	void parseRequest(const std::string raw_request);
+	void parseBody(std::istringstream &request_stream, std::string &body_section);
+	void parseRequestLine(const std::string request_line);
+    void parseHeaders(const std::string headers_sectionvoid);
+    
+    void handleRequest();
 
     void clear();
-    bool validateRequest() const;
+    // bool validateRequest() const;
 };
+
+std::ostream& operator<<(std::ostream& os, const Request& request);
 
 #endif
