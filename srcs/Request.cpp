@@ -37,7 +37,13 @@ Request& Request::operator=(const Request& other)
 // Setters
 void Request::setMethod(const std::string method)
 {
-	_method = method;
+	if (method == "GET" || method == "POST" || method == "DELETE")
+		_method = method;
+	else
+	{
+		_method = "UNKNOWN";
+		setValid(false);
+	}	
 
 }
 

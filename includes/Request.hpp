@@ -46,8 +46,6 @@ public:
 	void parseRequestLine(const std::string request_line);
     void parseHeaders(const std::string headers_sectionvoid);
     
-    void handleRequest();
-
     void clear();
     // bool validateRequest() const;
 };

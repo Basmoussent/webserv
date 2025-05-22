@@ -16,11 +16,22 @@ public:
     ~Handler();
 
     void process();
+    void handleGet();
+    void handlePost();
+    void handleDelete();
 
     // Getters
-    const std::string& getResponse() const;
     int getStatusCode() const;
+    const std::string& getResponse() const;
+    std::string getResponse();
     bool isValid() const;
-};
 
-#endif // HANDLER_HPP
+    // Setters
+    void setStatusCode(int statusCode);
+    void setResponse(const std::string& response);
+    void setValid(bool isValid);
+
+};
+std::ostream& operator<<(std::ostream& os, const Handler& handler);
+
+#endif
