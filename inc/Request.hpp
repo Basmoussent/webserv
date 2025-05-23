@@ -16,6 +16,9 @@ private:
     std::string                         _body;
     std::string                        _query_String;
     std::string                         _host;
+    std::string                         _boundary;
+    bool                                _multiform;
+    bool                                _chunked;
     bool                                _isValid;
 
 public:

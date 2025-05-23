@@ -4,7 +4,7 @@
 #include "Handler.hpp"
 
 int main(int ac, char **av) {
-    const int NUM_REQUESTS = 3;
+    const int NUM_REQUESTS = 4;
     std::string requests[NUM_REQUESTS];
     
     requests[0] = "GET /log?user=user HTTP/1.1\r\n"
@@ -25,9 +25,20 @@ int main(int ac, char **av) {
                   "Host: 127.0.0.1\r\n"
                   "\r\n"
                   "post_20250523_195301.log";
+    
+    requests[3] = "POST /upload HTTP/1.1\r\n"
+                  "Host: 127.0.0.1\r\n"
+                  "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+                  "Content-Length: 267\r\n"
+                  "\r\n"
+                  "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+                  "Content-Disposition: form-data; name=\"file\"; filename=\"example.txt\"\r\n"
+                  "Content-Type: text/plain\r\n"
+                  "\r\n"
+                  "Hello, this is the content of the uploaded file.\r\n"
+                  "------WebKitFormBoundary7MA4YWxkTrZu0gW--\r\n";
                 
     ConfigParser parser;
-
     if (ac < 2) {
         std::cerr << "Usage: ./a.out <config_file>" << std::endl;
         return 1;
