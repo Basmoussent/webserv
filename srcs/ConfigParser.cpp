@@ -162,6 +162,19 @@ const std::vector<Server>& ConfigParser::getServers() const {
 	return this->_servers;
 }
 
+const Server& ConfigParser::getServerByPort(int port) const {
+	for (std::size_t i = 0; i < this->_servers.size(); ++i){
+		std::map<std::string, std::string>::const_iterator it = this->_servers[i].instruct.find("listen");
+		if (it != this->_servers[i].instruct.end()) {
+			int i;
+			sscanf(it->second.c_str(), "%d", &i);
+			if (i == port)
+				return this->_servers[i];
+		}
+	}
+	throw std::runtime_error("Server not found for the given port.");
+}
+
 std::string ConfigParser::trim(const std::string& s) {
 	size_t start = s.find_first_not_of(" \t\r\n");
 	size_t end = s.find_last_not_of(" \t\r\n");

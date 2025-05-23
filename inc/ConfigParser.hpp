@@ -59,6 +59,7 @@ class ConfigParser {
 		bool parseFile(const std::string& filename);
 		void printServers() const;
 		const std::vector<Server>&	getServers() const;
+		const Server& getServerByPort(int port) const;
 
 };
 
