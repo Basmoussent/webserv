@@ -23,7 +23,7 @@ public:
         if (it != servers.end()) {
             return it->second;
         }
-        return servers[default_port];
+        throw std::runtime_error("No server found on port " + std::to_string(port));
     }
 
     // Ajouter un serveur
