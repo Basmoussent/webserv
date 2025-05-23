@@ -8,23 +8,24 @@ int main(int ac, char **av) {
     std::string requests[NUM_REQUESTS];
     
     requests[0] = "GET /log?user=user HTTP/1.1\r\n"
-                  "Host: example.com\r\n"
+                  "Host: 127.0.0.1\r\n"
                   "\r\n";
 
-    requests[1] = "POST /submit HTTP/1.1\r\n"
-                  "Host: example.com\r\n"
+    requests[1] = "POST /test HTTP/1.1\r\n"
+                  "Host: 127.0.0.1\r\n"
                   "Content-Type: application/json\r\n"
                   "Content-Length: 52\r\n"
                   "\r\n"
                   "{\r\n"
                   "  \"username\": \"alice\",\r\n"
-                  "  \"password\": \"secret123\"\r\n"
+                  "  \"password\": \"qwe\"\r\n"
                   "}\r\n";
 
-    requests[2] = "DELETE /resource HTTP/1.1\r\n"
-                  "Host: example.com\r\n"
-                  "\r\n";
-
+    requests[2] = "DELETE /test HTTP/1.1\r\n"
+                  "Host: 127.0.0.1\r\n"
+                  "\r\n"
+                  "post_20250523_195301.log";
+                
     ConfigParser parser;
 
     if (ac < 2) {

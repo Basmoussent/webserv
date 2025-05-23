@@ -19,8 +19,8 @@ public:
 
     void process();
     void handleGet();
-    void handlePost();
-    void handleDelete();
+    void handlePost(std::string& path);
+    void handleDelete(std::string &path);
 
     // Getters
     int getStatusCode() const;

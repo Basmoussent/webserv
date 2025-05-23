@@ -58,12 +58,19 @@ void Request::setHttpVersion(const std::string httpVersion)
 
 void Request::setHeader(const std::string key, const std::string value)
 {
-	_headers[key] = value;
+	size_t start = value.find_first_not_of(" \t\r\n");
+	size_t end = value.find_last_not_of(" \t\r\n");
+	_headers[key] = value.substr(start, end - start + 1);
 }
 
 void Request::setBody(const std::string body)
 {
-	_body += body;
+	size_t start = body.find_first_not_of(" \t\r");
+	size_t end = body.find_last_not_of(" \t\r");
+	if (start != std::string::npos && end != std::string::npos)
+		_body += body.substr(start, end - start + 1);
+	else
+		_body += body;
 }
 
 void Request::setValid(bool isValid)
@@ -154,7 +161,6 @@ void Request::parseBody(std::istringstream &request_stream, std::string &body_se
 		if (body_section.empty())
 			break ;
 		setBody(body_section);
-		setBody("\n");
 	}
 }
 void Request::parseRequestLine(const std::string request_line)
