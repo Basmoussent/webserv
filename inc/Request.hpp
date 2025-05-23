@@ -14,6 +14,8 @@ private:
     std::string                         _httpVersion;
     std::map<std::string, std::string>  _headers;
     std::string                         _body;
+    std::string                        _query_String;
+    std::string                         _host;
     bool                                _isValid;
 
 public:
@@ -30,6 +32,7 @@ public:
     const std::string&  getHeader(const std::string& key) const;
     const std::map<std::string, std::string>  getFullHeader() const;
     const std::string&  getBody() const;
+    const std::string&  getQueryString() const;
     bool                isValid() const;
 
     // Setters
@@ -38,6 +41,7 @@ public:
     void setHttpVersion(const std::string httpVersion);
     void setHeader(const std::string key, const std::string value);
     void setBody(const std::string body);
+    void setQueryString(const std::string queryString);
     void setValid(bool isValid);
 
     // Parsers
@@ -46,8 +50,6 @@ public:
 	void parseRequestLine(const std::string request_line);
     void parseHeaders(const std::string headers_sectionvoid);
     
-    void handleRequest();
-
     void clear();
     // bool validateRequest() const;
 };

@@ -40,8 +40,10 @@ void Request::setMethod(const std::string method)
 	if (method == "GET" || method == "POST" || method == "DELETE")
 		_method = method;
 	else
+	{
+		_method = "UNKNOWN";
 		setValid(false);
-
+	}	
 }
 
 void Request::setUri(const std::string uri)
@@ -69,6 +71,11 @@ void Request::setValid(bool isValid)
 	_isValid = isValid;
 }
 
+void Request::setQueryString(const std::string queryString)
+{
+	_query_String = queryString;
+}
+
 // Getters
 const std::string& Request::getMethod() const
 {
@@ -83,6 +90,11 @@ const std::string& Request::getUri() const
 const std::string& Request::getHttpVersion() const
 {
 	return _httpVersion;
+}
+
+const std::string& Request::getQueryString() const
+{
+	return _query_String;
 }
 
 const std::string& Request::getHeader(const std::string& key) const
@@ -131,6 +143,8 @@ void Request::parseRequest(const std::string raw_request)
 	}
 	parseBody(request_stream, body_section);
 	parseHeaders(headers_section);
+	if (getHeader("Host").empty())
+		setValid(false);
 }
 
 void Request::parseBody(std::istringstream &request_stream, std::string &body_section)
@@ -153,6 +167,12 @@ void Request::parseRequestLine(const std::string request_line)
 	if (line_stream >> method >> uri >> http_version)
 	{
 		setMethod(method);
+		if(uri.find('?') != std::string::npos)
+		{
+			std::size_t pos = uri.find('?');
+			setQueryString(uri.substr(pos + 1));
+			uri = uri.substr(0, pos);
+		}
 		setUri(uri);
 		setHttpVersion(http_version);
 		setValid(true);
@@ -184,6 +204,8 @@ std::ostream& operator<<(std::ostream& os, const Request& request)
 {
 	os << "Method: " << request.getMethod() << "\n";
 	os << "URI: " << request.getUri() << "\n";
+	if (!request.getQueryString().empty())
+		os << "Query String: " << request.getQueryString() << "\n";
 	os << "HTTP Version: " << request.getHttpVersion() << "\n";
 	os << "Headers:\n";
 
