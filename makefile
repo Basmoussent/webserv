@@ -1,5 +1,6 @@
-SRCS =	./srcs/main.cpp \
-		./srcs/ConfigParser.cpp
+SRCS =	./main.cpp \
+		./srcs/ConfigParser.cpp \
+		./srcs/ConfigValidator.cpp
 
 CC = c++
 NAME = webserv
