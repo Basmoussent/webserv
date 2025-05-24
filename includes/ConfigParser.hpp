@@ -8,6 +8,7 @@
 #include <sstream>
 #include <vector>
 #include <unistd.h>
+#include <cstdlib>
 
 struct Location
 {

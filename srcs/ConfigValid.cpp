@@ -67,7 +67,7 @@ bool ConfigParser::isValidPort(const std::string& s) const
 		return false;
 	int port;
 
-	port = std::atoi(s.c_str());
+	port = atoi(s.c_str());
 	if (port >= 0 && port <= 65535)
 		return true;
 	return false;
@@ -85,7 +85,7 @@ bool ConfigParser::isValidIP(const std::string& ip) const
 			return false;
 		int num;
 
-		num = std::atoi(token.c_str());
+		num = atoi(token.c_str());
 		if (num < 0 || num > 255)
 			return false;
 		count++;
@@ -104,7 +104,7 @@ bool ConfigParser::isValidErrorPage(const std::string& val) const
 		return false;
 	int code;
 	
-	code = std::atoi(codeStr.c_str());
+	code = atoi(codeStr.c_str());
 	if ((code >= 400 && code < 600) && !path.empty() && access(path.c_str(), F_OK) == 0)
 		return true;
 	return false;

@@ -64,5 +64,5 @@ key = 2 obligatoire dans les serveur
 
 Chose restante a faire :
 	-definir le plus petit fichier conf possible 
-	-gerer les bracket ouvrante
+	-gerer les brackets ouvrante
 	-gere 2, 3 bricole sur chaque value recu par la key

@@ -1,27 +1,31 @@
-SRCS =	./main.cpp \
-		./srcs/ConfigParser.cpp \
-		./srcs/ConfigValid.cpp
-
-CC = c++
 NAME = webserv
+CC = c++
+CFLAGS = -Wall -Wextra -Werror -std=c++98
 
-CFLANG = -Wall -Wextra -Werror -std=c++98
+SRC_DIR = srcs
+OBJ_DIR = obj
+
+SRCS =	./main.cpp \
+		./$(SRC_DIR)/ConfigParser.cpp \
+		./$(SRC_DIR)/ConfigValid.cpp
+
 OBJS = $(SRCS:.cpp=.o)
-
+OBJS := $(OBJS:./%=$(OBJ_DIR)/%)
 
 all: $(NAME)
 
-$(NAME): $(OBJS)
-	$(CC) $(CFLAG) -o $(NAME) $(OBJS)
+$(NAME): $(OBJ_DIR) $(OBJS)
+	$(CC) $(CFLAGS) -o $(NAME) $(OBJS)
 
-%.o: %.cpp
-	$(CC) $(CFLAG) -c $< -o $@
+$(OBJ_DIR)/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
 
-%.p: %.cpp
-	$(CC) -MM $< > $@
+$(OBJ_DIR):
+	mkdir -p $(OBJ_DIR)
 
 clean:
-	rm -f $(OBJS)
+	rm -rf $(OBJ_DIR)
 
 fclean: clean
 	rm -f $(NAME)
