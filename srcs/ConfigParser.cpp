@@ -76,7 +76,7 @@ bool ConfigParser::parseLine(const std::string& line)
 	}
 	else if (_keywords.find(word) == _keywords.end())
 	{
-		std::cerr << "Error: bloError: unknown keyword 'c not closed correctly. '" << word << "'." << std::endl;
+		std::cerr << "Error: unknown keyword '" << word << "'." << std::endl;
 		return false;
 	}
 	else
@@ -126,8 +126,6 @@ bool ConfigParser::handleClosingBrace()
 	}
 	else if (this->_blockDepth == 1)
 	{
-		// if (!validateMandatoryDirectives(this->_currentServer))
-		// 	return false;
 		this->_servers.push_back(this->_currentServer);
 		this->_inServer = false;
 		this->_blockDepth = 0;
@@ -202,30 +200,4 @@ std::string ConfigParser::trim(const std::string& s)
 	if (start == std::string::npos || end == std::string::npos)
 		return "";
 	return s.substr(start, end - start + 1);
-}
-
-void ConfigParser::printServers() const
-{
-	for (std::size_t s = 0; s < this->_servers.size(); ++s)
-	{
-		std::cout << "\n--- SERVER " << s + 1 << " ---" << std::endl;
-
-		std::map<std::string, std::string>::const_iterator it;
-		for (it = this->_servers[s].instruct.begin(); it != this->_servers[s].instruct.end(); ++it)
-		{
-			std::cout << "  " << it->first << " : " << it->second << std::endl;
-		}
-
-		for (std::size_t i = 0; i < this->_servers[s].locations.size(); ++i)
-		{
-			std::cout << "\n  Location: " << this->_servers[s].locations[i].path << std::endl;
-
-			std::map<std::string, std::string>::const_iterator lit;
-			for (lit = this->_servers[s].locations[i].instruct.begin();
-					lit != this->_servers[s].locations[i].instruct.end(); ++lit)
-				{
-				std::cout << "    " << lit->first << " : " << lit->second << std::endl;
-			}
-		}
-	}
 }

@@ -11,7 +11,7 @@ int main(int ac, char **av)
 	ConfigParser parser;
 	if (!parser.parseFile(av[1]))
 	{
-		std::cerr << "Échec du parsing du fichier de configuration." << std::endl;
+		std::cerr << "Configuration file parsing failed." << std::endl;
 		return 1;
 	}
 	parser.printServers();

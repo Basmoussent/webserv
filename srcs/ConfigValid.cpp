@@ -1,7 +1,7 @@
 #include "../includes/ConfigParser.hpp"
-#include <unistd.h>
 
-bool ConfigParser::isValueValid(const std::string& key, const std::string& value) const {
+bool ConfigParser::isValueValid(const std::string& key, const std::string& value) const
+{
 	if (key == "listen")
 		return isValidPort(value);
 
@@ -14,8 +14,8 @@ bool ConfigParser::isValueValid(const std::string& key, const std::string& value
 	if (key == "client_max_body_size")
 		return isInteger(value);
 
-	// if (key == "allow_methods")
-	// 	return areValidMethods(value);
+	if (key == "allow_methods")
+		return ValidMethods(value);
 
 	if (key == "cgi_ext")
 		return isValidExtension(value);
@@ -23,20 +23,17 @@ bool ConfigParser::isValueValid(const std::string& key, const std::string& value
 	if (key == "error_page")
 		return isValidErrorPage(value);
 
-	// if (key == "index")
-	// 	return areWords(value);
+	if (key == "index")
+		return isValidIndex(value);
 
 	if (key == "root" || key == "upload_dir" || key == "cgi_path")
-		return isValidPath(value); // optionnel : vérifier avec access(value.c_str(), F_OK)
+		return isValidPath(value);
 
 	return true;
 }
 
 bool ConfigParser::isValidPath(const std::string& path) const
 {
-	if (path.empty())
-		return false;
-
 	if (access(path.c_str(), F_OK) == 0)
 		return true;
 	return false;
@@ -44,9 +41,6 @@ bool ConfigParser::isValidPath(const std::string& path) const
 
 bool ConfigParser::isValidExtension(const std::string& s) const
 {
-	if (s.empty())
-		return false;
-
 	const std::string ext[] = {".py", ".sh"};
 	for (size_t i = 0; i < sizeof(ext); ++i)
 	{
@@ -59,9 +53,6 @@ bool ConfigParser::isValidExtension(const std::string& s) const
 
 bool ConfigParser::isInteger(const std::string& s) const
 {
-	if (s.empty())
-		return false;
-
 	for (size_t i = 0; i < s.size(); ++i)
 	{
 		if (!isdigit(s[i]))
@@ -110,7 +101,7 @@ bool ConfigParser::isValidErrorPage(const std::string& val) const
 	
 	iss >> codeStr >> path;
 	if (!isInteger(codeStr))
-	return false;
+		return false;
 	int code;
 	
 	code = std::atoi(codeStr.c_str());
@@ -119,17 +110,57 @@ bool ConfigParser::isValidErrorPage(const std::string& val) const
 	return false;
 }
 
-// bool ConfigParser::areValidMethods(const std::string& val) const
-// {
-// 	std::istringstream iss(val);
-// 	std::string method;
-// 	const std::string valid[] = {"GET", "POST", "DELETE"};
-// 	int i;
+bool ConfigParser::ValidMethods(const std::string& val) const
+{
+	std::istringstream iss(val);
+	std::string method;
+	
+	while (iss >> method)
+	{
+		if (method != "GET" && method != "POST" && method != "DELETE")
+			return false;
+	}
+	return true;
+}
 
-// 	while (iss >> method)
-// 	{
-// 		if (valid[i] == method)
-// 			return true;
-// 	}
-// 	return false;
-// }
+bool	ConfigParser::isValidIndex(const std::string& val) const
+{
+	std::istringstream iss(val);
+	std::string index;
+	std::string path;
+
+	while (iss >> index)
+	{
+		path = "/var/www/html/" + index;
+		//a verifier
+		// if (access(path.c_str(), F_OK) == 0)
+			return true;
+	}
+	return false;
+}
+
+void ConfigParser::printServers() const
+{
+	for (std::size_t s = 0; s < this->_servers.size(); ++s)
+	{
+		std::cout << "\n--- SERVER " << s + 1 << " ---" << std::endl;
+
+		std::map<std::string, std::string>::const_iterator it;
+		for (it = this->_servers[s].instruct.begin(); it != this->_servers[s].instruct.end(); ++it)
+		{
+			std::cout << "  " << it->first << " : " << it->second << std::endl;
+		}
+
+		for (std::size_t i = 0; i < this->_servers[s].locations.size(); ++i)
+		{
+			std::cout << "\n  Location: " << this->_servers[s].locations[i].path << std::endl;
+
+			std::map<std::string, std::string>::const_iterator lit;
+			for (lit = this->_servers[s].locations[i].instruct.begin();
+					lit != this->_servers[s].locations[i].instruct.end(); ++lit)
+				{
+				std::cout << "    " << lit->first << " : " << lit->second << std::endl;
+			}
+		}
+	}
+}

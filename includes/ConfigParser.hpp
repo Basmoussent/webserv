@@ -7,6 +7,7 @@
 #include <map>
 #include <sstream>
 #include <vector>
+#include <unistd.h>
 
 struct Location
 {
@@ -47,11 +48,11 @@ class ConfigParser
 		bool	isInteger(const std::string& s) const;
 		bool	isValidPort(const std::string& s) const;
 		bool	isValidIP(const std::string& ip) const;
-		bool	areValidMethods(const std::string& val) const;
+		bool	ValidMethods(const std::string& val) const;
 		bool	isValidErrorPage(const std::string& val) const;
-		bool	isName(const std::string& val) const;
 		bool	isValidExtension(const std::string& s) const;
 		bool	isValidPath(const std::string& path) const ;
+		bool	isValidIndex(const std::string& val) const;
 
 		//jsp c'est Basem
 		std::string	getInstruct(const std::string& key, const Server server) const;
