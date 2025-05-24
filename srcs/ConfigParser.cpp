@@ -44,7 +44,7 @@ bool ConfigParser::parseFile(const std::string& filename)
 		if (!parseLine(line))
 			return false;
 	}
-	if (this->_blockDepth != 0)
+	if (_blockDepth != 0)
 	{
 		std::cerr << "Error: block not closed correctly." << std::endl;
 		return false;
@@ -64,15 +64,23 @@ bool ConfigParser::parseLine(const std::string& line)
 	std::string word;
 	iss >> word;
 
-	if (word == "server")
+	if (word == "server") {
+		iss >> word;
+		if (word == "{") 
+			_inServer = true;
 		return handleServerBlock();
-	else if (word == "location")
-	return handleLocationBlock(iss);
+	}
+	else if (word == "location") {
+		return handleLocationBlock(iss);
+	}
 	else if (word == "}")
-	return handleClosingBrace();
+		return handleClosingBrace();
 	else if (word == "{")
 	{
-		;
+		if (_inServer == false && _blockDepth == 1)
+			_inServer = true;
+		if (_inLocation == false && _blockDepth == 2)
+			_inLocation = true;
 	}
 	else if (_keywords.find(word) == _keywords.end())
 	{
@@ -81,6 +89,11 @@ bool ConfigParser::parseLine(const std::string& line)
 	}
 	else
 	{
+		if ((_inServer == false && _blockDepth == 1) || (_inLocation == false && _blockDepth == 2))
+		{
+			std::cout << "Error: no opening bracket" << std::endl;
+			return false;
+		}
 		if (!assignKeyValue(word, iss))
 			return false;
 	}
@@ -89,46 +102,47 @@ bool ConfigParser::parseLine(const std::string& line)
 
 bool ConfigParser::handleServerBlock()
 {
-	if (this->_blockDepth != 0)
+	if (_blockDepth != 0)
 	{
 		std::cerr << "zError: misplaced 'server' block." << std::endl;
 		return false;
 	}
-	this->_currentServer = Server();
-	this->_inServer = true;
-	this->_blockDepth = 1;
+	_currentServer = Server();
+	_blockDepth = 1;
 	return true;
 }
 
 bool ConfigParser::handleLocationBlock(std::istringstream& iss)
 {
-	if (this->_blockDepth != 1)
+	if (_blockDepth != 1)
 	{
 		std::cerr << "Error: 'location' block outside a 'server'." << std::endl;
 		return false;
 	}
 	std::string path;
 	iss >> path;
-	this->_currentLocation = Location();
-	this->_currentLocation.path = path;
-	this->_inLocation = true;
-	this->_blockDepth = 2;
+	_currentLocation = Location();
+	_currentLocation.path = path;
+	iss >> path;
+	if (path == "{") 
+		_inLocation = true;
+	_blockDepth = 2;
 	return true;
 }
 
 bool ConfigParser::handleClosingBrace()
 {
-	if (this->_blockDepth == 2)
+	if (_blockDepth == 2)
 	{
-		this->_currentServer.locations.push_back(this->_currentLocation);
-		this->_inLocation = false;
-		this->_blockDepth = 1;
+		_currentServer.locations.push_back(_currentLocation);
+		_inLocation = false;
+		_blockDepth = 1;
 	}
-	else if (this->_blockDepth == 1)
+	else if (_blockDepth == 1)
 	{
-		this->_servers.push_back(this->_currentServer);
-		this->_inServer = false;
-		this->_blockDepth = 0;
+		_servers.push_back(_currentServer);
+		_inServer = false;
+		_blockDepth = 0;
 	}
 	else
 	{
@@ -157,10 +171,10 @@ bool ConfigParser::assignKeyValue(const std::string& key, std::istringstream& is
 		std::cerr << "Error: invalid value for '" << key << "' : '" << value << "'" << std::endl;
 		return false;
 	}
-	if (this->_inLocation)
-		this->_currentLocation.instruct[key] = value;
+	if (_inLocation)
+		_currentLocation.instruct[key] = value;
 	else if (_inServer)
-		this->_currentServer.instruct[key] = value;
+		_currentServer.instruct[key] = value;
 	return true;
 }
 
@@ -174,20 +188,20 @@ std::string ConfigParser::getInstruct(const std::string& key, const Server serve
 
 const std::vector<Server>& ConfigParser::getServers() const
 {
-	return this->_servers;
+	return _servers;
 }
 
 const Server& ConfigParser::getServerByPort(int port) const
 {
-	for (std::size_t i = 0; i < this->_servers.size(); ++i)
+	for (std::size_t i = 0; i < _servers.size(); ++i)
 	{
-		std::map<std::string, std::string>::const_iterator it = this->_servers[i].instruct.find("listen");
-		if (it != this->_servers[i].instruct.end())
+		std::map<std::string, std::string>::const_iterator it = _servers[i].instruct.find("listen");
+		if (it != _servers[i].instruct.end())
 		{
 			int i;
 			sscanf(it->second.c_str(), "%d", &i);
 			if (i == port)
-				return this->_servers[i];
+				return _servers[i];
 		}
 	}
 	throw std::runtime_error("Server not found for the given port.");

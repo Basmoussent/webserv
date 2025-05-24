@@ -28,6 +28,7 @@ class ConfigParser
 		int		_blockDepth;
 		bool	_inServer;
 		bool	_inLocation;
+		bool	_bracket;
 
 		std::map<std::string, int>	_keywords;
 
@@ -54,6 +55,7 @@ class ConfigParser
 		bool	isValidExtension(const std::string& s) const;
 		bool	isValidPath(const std::string& path) const ;
 		bool	isValidIndex(const std::string& val) const;
+		bool	isName(const std::string& name) const;
 
 		//jsp c'est Basem
 		std::string	getInstruct(const std::string& key, const Server server) const;

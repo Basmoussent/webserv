@@ -25,7 +25,7 @@ dans tous les fichier qui se presente vous retrouverais :
 
 key = 0 pas obligatoire
 key = 1 obligatoire dans une locations
-key = 2 obligatoire dans les serveur
+key = 2 obligatoire dans les serveurs
 
 	---Server---
 	_keywords["listen"] = 2;
@@ -64,5 +64,4 @@ key = 2 obligatoire dans les serveur
 
 Chose restante a faire :
 	-definir le plus petit fichier conf possible 
-	-gerer les brackets ouvrante
 	-gere 2, 3 bricole sur chaque value recu par la key

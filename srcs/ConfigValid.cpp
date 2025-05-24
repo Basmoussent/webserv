@@ -8,6 +8,9 @@ bool ConfigParser::isValueValid(const std::string& key, const std::string& value
 	if (key == "host")
 		return isValidIP(value);
 
+	if (key == "server_name")
+		return isName(value);
+
 	if (key == "autoindex" || key == "cgi")
 		return (value == "on" || value == "off");
 
@@ -29,6 +32,17 @@ bool ConfigParser::isValueValid(const std::string& key, const std::string& value
 	if (key == "root" || key == "upload_dir" || key == "cgi_path")
 		return isValidPath(value);
 
+	return true;
+}
+
+bool	ConfigParser::isName(const std::string& name) const
+{
+	for(size_t i = 0; i < name.size() ; ++i)
+	{
+		char c = name[i];
+		if(!isalnum(c) && c == '.')
+			return false;
+	}
 	return true;
 }
 
@@ -139,25 +153,26 @@ bool	ConfigParser::isValidIndex(const std::string& val) const
 	return false;
 }
 
+// fonction que je vais enlever permet seulement de faire les checks
 void ConfigParser::printServers() const
 {
-	for (std::size_t s = 0; s < this->_servers.size(); ++s)
+	for (std::size_t s = 0; s < _servers.size(); ++s)
 	{
 		std::cout << "\n--- SERVER " << s + 1 << " ---" << std::endl;
 
 		std::map<std::string, std::string>::const_iterator it;
-		for (it = this->_servers[s].instruct.begin(); it != this->_servers[s].instruct.end(); ++it)
+		for (it = _servers[s].instruct.begin(); it != _servers[s].instruct.end(); ++it)
 		{
 			std::cout << "  " << it->first << " : " << it->second << std::endl;
 		}
 
-		for (std::size_t i = 0; i < this->_servers[s].locations.size(); ++i)
+		for (std::size_t i = 0; i < _servers[s].locations.size(); ++i)
 		{
-			std::cout << "\n  Location: " << this->_servers[s].locations[i].path << std::endl;
+			std::cout << "\n  Location: " << _servers[s].locations[i].path << std::endl;
 
 			std::map<std::string, std::string>::const_iterator lit;
-			for (lit = this->_servers[s].locations[i].instruct.begin();
-					lit != this->_servers[s].locations[i].instruct.end(); ++lit)
+			for (lit = _servers[s].locations[i].instruct.begin();
+					lit != _servers[s].locations[i].instruct.end(); ++lit)
 				{
 				std::cout << "    " << lit->first << " : " << lit->second << std::endl;
 			}
