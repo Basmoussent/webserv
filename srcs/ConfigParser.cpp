@@ -25,7 +25,7 @@ bool ConfigParser::parseFile(const std::string& filename)
 	std::ifstream file;
 	if (!openFile(filename, file))
 	{
-		std::cerr << "Erreur : impossible d'ouvrir le fichier." << std::endl;
+		std::cerr << "Error: unable to open file." << std::endl;
 		return false;
 	}
 
@@ -46,7 +46,7 @@ bool ConfigParser::parseFile(const std::string& filename)
 	}
 	if (this->_blockDepth != 0)
 	{
-		std::cerr << "Erreur : bloc non fermé correctement." << std::endl;
+		std::cerr << "Error: block not closed correctly." << std::endl;
 		return false;
 	}
 	return true;
@@ -76,7 +76,7 @@ bool ConfigParser::parseLine(const std::string& line)
 	}
 	else if (_keywords.find(word) == _keywords.end())
 	{
-		std::cerr << "Erreur : mot-cle inconnu '" << word << "'." << std::endl;
+		std::cerr << "Error: bloError: unknown keyword 'c not closed correctly. '" << word << "'." << std::endl;
 		return false;
 	}
 	else
@@ -91,7 +91,7 @@ bool ConfigParser::handleServerBlock()
 {
 	if (this->_blockDepth != 0)
 	{
-		std::cerr << "Erreur : bloc 'server' mal placé." << std::endl;
+		std::cerr << "zError: misplaced 'server' block." << std::endl;
 		return false;
 	}
 	this->_currentServer = Server();
@@ -104,7 +104,7 @@ bool ConfigParser::handleLocationBlock(std::istringstream& iss)
 {
 	if (this->_blockDepth != 1)
 	{
-		std::cerr << "Erreur : bloc 'location' en dehors d'un 'server'." << std::endl;
+		std::cerr << "Error: 'location' block outside a 'server'." << std::endl;
 		return false;
 	}
 	std::string path;
@@ -134,7 +134,7 @@ bool ConfigParser::handleClosingBrace()
 	}
 	else
 	{
-		std::cerr << "Erreur : fermeture de bloc inattendue." << std::endl;
+		std::cerr << "Error: unexpected block closure." << std::endl;
 		return false;
 	}
 	return true;
@@ -151,12 +151,12 @@ bool ConfigParser::assignKeyValue(const std::string& key, std::istringstream& is
 	}
 	if (key.empty() || value.empty())
 	{
-		std::cerr << "Erreur : la directive '" << key << "' doit avoir une valeur." << std::endl;
+		std::cerr << "Error: the directive '" << key << "' must have a value." << std::endl;
 		return false;
 	}
 	if (!isValueValid(key, value))
 	{
-		std::cerr << "Erreur : valeur invalide pour '" << key << "' : '" << value << "'" << std::endl;
+		std::cerr << "Error: invalid value for '" << key << "' : '" << value << "'" << std::endl;
 		return false;
 	}
 	if (this->_inLocation)
@@ -177,6 +177,22 @@ std::string ConfigParser::getInstruct(const std::string& key, const Server serve
 const std::vector<Server>& ConfigParser::getServers() const
 {
 	return this->_servers;
+}
+
+const Server& ConfigParser::getServerByPort(int port) const
+{
+	for (std::size_t i = 0; i < this->_servers.size(); ++i)
+	{
+		std::map<std::string, std::string>::const_iterator it = this->_servers[i].instruct.find("listen");
+		if (it != this->_servers[i].instruct.end())
+		{
+			int i;
+			sscanf(it->second.c_str(), "%d", &i);
+			if (i == port)
+				return this->_servers[i];
+		}
+	}
+	throw std::runtime_error("Server not found for the given port.");
 }
 
 std::string ConfigParser::trim(const std::string& s)

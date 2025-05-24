@@ -65,6 +65,8 @@ class ConfigParser
 		void printServers() const;
 
 		const std::vector<Server>&	getServers() const;
+		const Server& getServerByPort(int port) const;
+
 };
 
 #endif
