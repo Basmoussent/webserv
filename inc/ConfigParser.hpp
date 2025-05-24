@@ -7,6 +7,8 @@
 #include <map>
 #include <sstream>
 #include <vector>
+#include <cstdlib>
+#include <sstream>
 
 struct Location {
 	std::string path;
@@ -59,7 +61,7 @@ class ConfigParser {
 		bool parseFile(const std::string& filename);
 		void printServers() const;
 		const std::vector<Server>&	getServers() const;
-		const Server& getServerByPort(int port) const;
+		Server& getServerByPort(int port) const;
 
 };
 

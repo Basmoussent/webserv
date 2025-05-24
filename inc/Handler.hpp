@@ -13,6 +13,12 @@ private:
     bool         _isValid;
     ConfigParser _configParser;
 
+    // Méthodes privées pour l'upload
+    std::string getUploadDirectory(const Server& server, const Location& location) const;
+    bool handleFileUpload(const std::string& uploadDir, const std::string& filename, const std::string& content);
+    std::string extractFilenameFromMultipart(const std::string& body, const std::string& boundary) const;
+    std::string extractContentFromMultipart(const std::string& body, const std::string& boundary) const;
+
 public:
     Handler(const Request& req, const ConfigParser& configParser);
     ~Handler();

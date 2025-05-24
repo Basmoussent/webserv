@@ -1,5 +1,6 @@
 #include "ConfigParser.hpp"
 
+
 ConfigParser::ConfigParser()
 	: _blockDepth(0), _inServer(false), _inLocation(false), _mandatoryCount(0)
 {
@@ -17,6 +18,7 @@ ConfigParser::ConfigParser()
 	_keywords["cgi"] = 1;
 	_keywords["cgi_path"] = 1;
 	_keywords["cgi_ext"] = 1;
+	_keywords["upload_dir"] = 0;
 }
 
 ConfigParser::~ConfigParser() {}
@@ -162,17 +164,16 @@ const std::vector<Server>& ConfigParser::getServers() const {
 	return this->_servers;
 }
 
-const Server& ConfigParser::getServerByPort(int port) const {
-	for (std::size_t i = 0; i < this->_servers.size(); ++i){
-		std::map<std::string, std::string>::const_iterator it = this->_servers[i].instruct.find("listen");
-		if (it != this->_servers[i].instruct.end()) {
-			int i;
-			sscanf(it->second.c_str(), "%d", &i);
-			if (i == port)
-				return this->_servers[i];
-		}
-	}
-	throw std::runtime_error("Server not found for the given port.");
+Server& ConfigParser::getServerByPort(int port) const {
+    for (std::vector<Server>::const_iterator it = _servers.begin(); it != _servers.end(); ++it) {
+        std::map<std::string, std::string>::const_iterator port_it = it->instruct.find("listen");
+        if (port_it != it->instruct.end() && atoi(port_it->second.c_str()) == port) {
+            return const_cast<Server&>(*it);
+        }
+    }
+    std::stringstream ss;
+    ss << port;
+    throw std::runtime_error("No server found on port " + ss.str());
 }
 
 std::string ConfigParser::trim(const std::string& s) {

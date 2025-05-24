@@ -65,12 +65,23 @@ void Request::setHeader(const std::string key, const std::string value)
 
 void Request::setBody(const std::string body)
 {
-	size_t start = body.find_first_not_of(" \t\r");
-	size_t end = body.find_last_not_of(" \t\r");
-	if (start != std::string::npos && end != std::string::npos)
-		_body += body.substr(start, end - start + 1);
-	else
+	if (_method == "DELETE") {
+		size_t start = body.find_first_not_of(" \t\r\n");
+		size_t end = body.find_last_not_of(" \t\r\n");
+		if (start != std::string::npos && end != std::string::npos)
+			_body = body.substr(start, end - start + 1);
+		else
+			_body = body;
+	} else if (_method == "POST" && _multiform) {
 		_body += body;
+	} else {
+		size_t start = body.find_first_not_of(" \t\r");
+		size_t end = body.find_last_not_of(" \t\r");
+		if (start != std::string::npos && end != std::string::npos)
+			_body += body.substr(start, end - start + 1);
+		else
+			_body += body;
+	}
 }
 
 void Request::setValid(bool isValid)
@@ -156,13 +167,26 @@ void Request::parseRequest(const std::string raw_request)
 
 void Request::parseBody(std::istringstream &request_stream, std::string &body_section)
 {
-	while (std::getline(request_stream, body_section))
-	{
-		if (body_section.empty())
-			break ;
-		setBody(body_section);
-	}
+    std::string line;
+    bool isFirstLine = true;
+    
+    while (std::getline(request_stream, line))
+    {
+        if (isFirstLine && line.empty())
+        {
+            isFirstLine = false;
+            continue;
+        }
+        if (!line.empty())
+        {
+            if (!body_section.empty())
+                body_section += "\n";
+            body_section += line;
+        }
+    }
+    setBody(body_section);
 }
+
 void Request::parseRequestLine(const std::string request_line)
 {
 	std::istringstream line_stream(request_line);
@@ -191,19 +215,30 @@ void Request::parseRequestLine(const std::string request_line)
 
 void Request::parseHeaders(std::string header)
 {
-	std::istringstream header_stream(header);
-	std::string line;
+    std::istringstream header_stream(header);
+    std::string line;
 
-	while (std::getline(header_stream, line))
-	{
-		std::size_t pos = line.find(':');
-		if (pos != std::string::npos)
-		{
-			std::string key = line.substr(0, pos);
-			std::string value = line.substr(pos + 1);
-			setHeader(key, value);
-		}
-	}
+    while (std::getline(header_stream, line))
+    {
+        std::size_t pos = line.find(':');
+        if (pos != std::string::npos)
+        {
+            std::string key = line.substr(0, pos);
+            std::string value = line.substr(pos + 1);
+            if (key == "Content-Type" && value.find("multipart/form-data") != std::string::npos)
+            {
+                std::size_t boundary_pos = value.find("boundary=");
+                if (boundary_pos != std::string::npos)
+                {
+                    _boundary = value.substr(boundary_pos + 9);
+                    _multiform = true;
+                }
+            }
+            else if (key == "Transfer-Encoding" && value.find("chunked") != std::string::npos)
+                _chunked = true;
+            setHeader(key, value);
+        }
+    }
 }
 
 std::ostream& operator<<(std::ostream& os, const Request& request)
