@@ -1,0 +1,6 @@
+cgi
+{
+	GET : renvoie la liste des script disponibles
+	POST : execute le script
+
+}
