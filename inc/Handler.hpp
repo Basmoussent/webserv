@@ -13,6 +13,9 @@ private:
     bool         _isValid;
     ConfigParser _configParser;
 
+    static std::string intToString(int value);
+    static std::string sizeToString(size_t value);
+
     // Méthodes privées pour l'upload
     std::string getUploadDirectory(const Server& server, const Location& location) const;
     bool handleFileUpload(const std::string& uploadDir, const std::string& filename, const std::string& content);
@@ -27,6 +30,7 @@ public:
     void handleGet();
     void handlePost(std::string& path);
     void handleDelete(std::string &path);
+    void handleCGI();
 
     // Getters
     int getStatusCode() const;

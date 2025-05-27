@@ -5,7 +5,7 @@
 #include "ConfigParser.hpp"
 
 void runTests(ConfigParser& parser) {
-    const int NUM_REQUESTS = 4;
+    const int NUM_REQUESTS = 5;
     std::string requests[NUM_REQUESTS];
     
     requests[0] = "GET /log?user=user HTTP/1.1\r\n"
@@ -38,23 +38,25 @@ void runTests(ConfigParser& parser) {
                   "\r\n"
                   "Hello, this is the content of the uploaded file.\r\n"
                   "------WebKitFormBoundary7MA4YWxkTrZu0gW--\r\n";
+    
+    requests[4] = "GET /cgi-bin HTTP/1.1\r\n"
+                  "Host: 127.0.0.1\r\n"
+                  "\r\n"
+                  "test.sh";
 
     // Test each request
     std::cout << "\n=== Testing Requests ===" << std::endl;
     for (int i = 0; i < NUM_REQUESTS; ++i) {
-        std::cout << "\nProcessing Request:" << std::endl;
+        std::cout << "\nProcessing Request " << i + 1 << ":" << std::endl;
         std::cout << "-------------------" << std::endl;
         std::cout << requests[i] << std::endl;
 
         try {
-            Request req(requests[i]);
-            Handler handler(req, parser);
-            
-            // Access configuration data
-            const std::vector<Server>& servers = parser.getServers();
-            if (servers.size() > 0) {
-                std::cout << "Response: " << handler.getResponse() << std::endl;
-            }
+            Request request(requests[i]);
+            Handler handler(request, parser);
+            std::cout << "\nResponse:" << std::endl;
+            std::cout << "-------------------" << std::endl;
+            std::cout << handler.getResponse() << std::endl;
         }
         catch (std::exception& e) {
             std::cerr << "Error processing request: " << e.what() << std::endl;

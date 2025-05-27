@@ -8,7 +8,10 @@
 #include <arpa/inet.h>
 #include <cstring>
 #include <fcntl.h>
+#include <sstream>
 #include "ConfigParser.hpp"
+#include "Request.hpp"
+#include "Handler.hpp"
 
 // Function to print socket information
 void printSocketInfo(int sock, const char* prefix) {
@@ -36,11 +39,15 @@ void setNonBlocking(int sock) {
 }
 
 // Function to send HTTP response
-void sendResponse(int client_socket, const std::string& content) {
-    std::string response = "HTTP/1.1 200 OK\r\n"
-                          "Content-Type: text/html\r\n"
-                          "Content-Length: " + std::to_string(content.length()) + "\r\n"
-                          "\r\n" + content;
+void sendResponse(int client_socket, const std::string& content)
+{
+    std::ostringstream oss;
+    oss << "HTTP/1.1 200 OK\r\n"
+        << "Content-Type: text/html\r\n"
+        << "Content-Length: " << content.length() << "\r\n"
+        << "\r\n" << content;
+
+    std::string response = oss.str();
     std::cout << "Sending response:\n" << response << std::endl;
     ssize_t sent = send(client_socket, response.c_str(), response.length(), 0);
     if (sent < 0) {
@@ -182,26 +189,23 @@ void runServer(ConfigParser& parser) {
                 }
                 std::cout << "Received " << bytes_received << " bytes" << std::endl;
 
-                // Get server host and port using find()
-                std::map<std::string, std::string>::const_iterator host_it = servers[i].instruct.find("host");
-                std::map<std::string, std::string>::const_iterator port_it = servers[i].instruct.find("listen");
+                // Create Request object and parse the received data
+                std::string raw_request(buffer, bytes_received);
+                Request request(raw_request);
                 
-                // Print the raw request with separated request line and headers
-                std::cout << "\nRequest received on " << host_it->second << ":" 
-                         << port_it->second << ":\n"
-                         << "Request line: " << strtok(buffer, "\n") << "\n"
-                         << "Headers:\n" << strtok(NULL, "") << std::endl;
-                
-                // print a simple work in progress message
-                std::string content = "<html><body>"
-                                    "<h1>Work in Progress</h1>"
-                                    "<p>Request received on server: " + 
-                                    host_it->second + ":" + 
-                                    port_it->second + "</p>"
-                                    "<p>Request parsing and handling will be implemented later.</p>"
-                                    "</body></html>";
-                
-                sendResponse(client_socket, content);
+                // Create Handler to process the request
+                Handler handler(request, parser);
+
+                // Send the response back to the client
+                std::string response = handler.getResponse();
+                ssize_t sent = send(client_socket, response.c_str(), response.length(), 0);
+                if (sent < 0) {
+                    std::cerr << "Failed to send response: " << strerror(errno) << std::endl;
+                } else {
+                    std::cout << "Sent " << sent << " bytes" << std::endl;
+                    std::cout << "Response sent:\n" << response << std::endl;
+                }
+
                 close(client_socket);
                 std::cout << "Connection closed" << std::endl;
             }

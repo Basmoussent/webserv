@@ -1,0 +1,10 @@
+print("Content-Type: text/html")
+print()
+
+print("<html>")
+print("<head><title>CGI Test</title></head>")
+print("<body>")
+print("<h1>Hello from CGI!</h1>")
+print("<p>This is a simple CGI script written in Python.</p>")
+print("</body>")
+print("</html>")

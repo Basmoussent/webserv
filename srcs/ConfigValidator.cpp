@@ -3,6 +3,7 @@
 #include <cctype>
 #include <iostream>
 #include <unistd.h>
+#include <stdlib.h>
 
 bool ConfigValidator::isInteger(const std::string& s)
 {
@@ -98,17 +99,16 @@ bool ConfigValidator::isValidPath(const std::string& Path)
     return true;  // Temporarily accept all paths
     
     // Original validation commented out
-    /*
-    std::string actual = Path;
-    if (!Path.empty() && Path[0] != '/') {
-        char cwd[PATH_MAX];
-        if (getcwd(cwd, sizeof(cwd)) == NULL) {
-            return false;
-        }
-        actual = std::string(cwd) + "/" + Path;
-    }
-    return (access(actual.c_str(), F_OK) == 0);
-    */
+    // std::string actual = Path;
+    // if (!Path.empty() && Path[0] != '/') {
+    //     char cwd[PATH_MAX];
+    //     if (getcwd(cwd, sizeof(cwd)) == NULL) {
+    //         return false;
+    //     }
+    //     actual = std::string(cwd) + "/" + Path;
+    // }
+    // return (access(actual.c_str(), F_OK) == 0);
+    
 }
 
 bool ConfigValidator::isValidIndex(const std::string& val)
