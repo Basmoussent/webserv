@@ -63,5 +63,26 @@ key = 2 obligatoire dans les serveurs
 ////////////////////////////////////////////////////////////////////
 
 Chose restante a faire :
-	-definir le plus petit fichier conf possible 
-	-gere 2, 3 bricole sur chaque value recu par la key
+	-definir le plus petit fichier conf possible (a voir avec l'equipe)
+	-gere 2, 3 bricole sur chaque value recu par la key, ci dessous -->
+
+
+	1.Problèmes de Path, (a voir avec l'equipe mais j'ai une petite idee ducoup)
+		-Le sujet propose une résolution path comme le suivant:
+		URL /kapouet est rootée sur /tmp/www
+		URL /kapouet/pouic/toto/pouet doit correspondre à /tmp/www/pouic/toto/pouet
+		sachant que si tu applique access() dessus pour les fichier d'exemple ils ne vont pas pouvoir access et la validation de parsing ne serait pas bon
+		puis est-ce qu'on accept d'autre cas de path, par exemple dans good_test/trim.config
+		il y a root    ./www
+		-du coup leerror_page depend un peu du root donc faut revoir l'error_page validation après avoir resolu la parsing du root
+
+   2. Problème de validation du server_name, (a voir avec l'equipe)
+		La directive server_name peut contenir plusieurs noms :     server_name example.org www.example.org alors actuellement on parse qu'un nom
+
+    3.comment on définit des méthodes HTTP, (a voir avec l'equipe)
+		Deux directives existent dans Nginx :
+		limit_except GET POST DELETE;
+		allow_methods (actuellement tu accept que ça mais sachant que c pas built-in NGINX mais un module tiers)
+		on fait quoi?
+
+	4.manque de gestion des redirections dans le parsing

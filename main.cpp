@@ -14,6 +14,7 @@ int main(int ac, char **av)
 		std::cerr << "Configuration file parsing failed." << std::endl;
 		return 1;
 	}
+	// parser.WhatIsYourName("Antoine Massy bref", "Massy");
 	parser.printServers();
 	return 0;
 }

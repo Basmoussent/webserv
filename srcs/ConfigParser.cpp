@@ -11,11 +11,13 @@ ConfigParser::ConfigParser()
 	_keywords["autoindex"] = 0;
 	_keywords["error_page"] = 0;
 	_keywords["client_max_body_size"] = 0;
+	//limit_except ?
 	_keywords["allow_methods"] = 1;
 	_keywords["cgi"] = 1;
 	_keywords["cgi_path"] = 1;
 	_keywords["cgi_ext"] = 1;
 	_keywords["upload_dir"] = 0;
+	_keywords["location"] = 1;
 }
 
 ConfigParser::~ConfigParser() {}
@@ -23,6 +25,7 @@ ConfigParser::~ConfigParser() {}
 bool ConfigParser::parseFile(const std::string& filename)
 {
 	std::ifstream file;
+	//check si c'est un dossier !!!!
 	if (!openFile(filename, file))
 	{
 		std::cerr << "Error: unable to open file." << std::endl;
