@@ -36,6 +36,7 @@ public:
     const std::map<std::string, std::string>  getFullHeader() const;
     const std::string&  getBody() const;
     const std::string&  getQueryString() const;
+    const std::string&  getHost() const;
     bool                isValid() const;
 
     // Setters

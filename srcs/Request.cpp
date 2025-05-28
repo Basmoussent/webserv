@@ -134,6 +134,11 @@ const std::string& Request::getBody() const
 	return _body;
 }
 
+const std::string& Request::getHost() const
+{
+	return _host;
+}
+
 bool Request::isValid() const
 {
 	return _isValid;
@@ -162,7 +167,7 @@ void Request::parseRequest(const std::string raw_request)
 	parseBody(request_stream, body_section);
 	parseHeaders(headers_section);
 	if (getHeader("Host").empty())
-		setValid(false);
+		setValid(false);	
 }
 
 void Request::parseBody(std::istringstream &request_stream, std::string &body_section)

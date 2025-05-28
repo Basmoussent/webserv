@@ -9,6 +9,7 @@
 #include <map>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <dirent.h>
 
 std::string Handler::intToString(int value) {
     std::stringstream ss;
@@ -38,6 +39,7 @@ void Handler::process()
 	{
         size_t i = 0;
         Server server;
+
         if (_configParser.getServers().empty())
         {
             setStatusCode(500);
@@ -53,25 +55,22 @@ void Handler::process()
         for (i = 0; i < _configParser.getServers().size(); i++)
         {
             server = _configParser.getServers()[i];
-            if (_request.getHeader("Host") == server.instruct["host"] || _request.getHeader("Host") == server.instruct["server_name"])
+            if (_request.getHeader("Host") == server.instruct["host"] + ":" + server.instruct["listen"] || _request.getHeader("Host") == server.instruct["server_name"])
                 break;
         }
         if (i == _configParser.getServers().size())
         {
             setStatusCode(404);
-            _response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nNot Found";
+            _response = "HTTP/1.1 404 Not Found 9\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nNot Found";
             return;
         }
         bool locationFound = false;
-        size_t j;
-        
-        for (j = 0; j < server.locations.size(); ++j)
+        size_t j = 0;
+        for (j = 0; j < server.locations.size(); j++)
         {
             if (server.locations[j].path == _request.getUri())
             {
                 std::string allowedMethods = server.locations[j].instruct["allow_methods"];
-                std::cout << "Allowed methods: " << allowedMethods << std::endl;
-                std::cout << "Request method: " << _request.getMethod() << "|"<< std::endl;
                 if (allowedMethods.find(_request.getMethod()) == std::string::npos)
                 {
                     setStatusCode(405);
@@ -82,17 +81,24 @@ void Handler::process()
                 break;
             }
         }
-
-        if (!locationFound)
-        {
+        if (!locationFound) {
+            for (j = 0; j < server.locations.size(); j++) {
+                if (server.locations[j].path == "/") {
+                    locationFound = true;
+                    break;
+                }
+            }
+        }
+        if (!locationFound) {
             setStatusCode(404);
-            _response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nNot Found";
+            _response = "HTTP/1.1 404 Not Found 9\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nNot Found";
             return;
         }
+
         if (_request.getUri() == "/cgi-bin")
             handleCGI();
         else if (_request.getMethod() == "GET")
-			handleGet();
+			handleGet(server, j);
 		else if (_request.getMethod() == "POST")
 			handlePost(server.locations[j].path);
 		else if (_request.getMethod() == "DELETE")
@@ -115,7 +121,7 @@ void Handler::handleCGI()
     
     for (size_t i = 0; i < _configParser.getServers().size(); i++) {
         server = _configParser.getServers()[i];
-        if (_request.getHeader("Host") == server.instruct["host"] || 
+        if (_request.getHeader("Host") == server.instruct["host"] + ":" + server.instruct["listen"] || 
             _request.getHeader("Host") == server.instruct["server_name"]) {
             for (size_t j = 0; j < server.locations.size(); j++) {
                 if (server.locations[j].path == "/cgi-bin") {
@@ -196,7 +202,7 @@ void Handler::handleCGI()
     env["SCRIPT_NAME"] = _request.getUri();
     env["SERVER_PROTOCOL"] = "HTTP/1.1";
     env["SERVER_SOFTWARE"] = "webserv/1.0";
-    env["REMOTE_ADDR"] = server.instruct["host"];
+    env["REMOTE_ADDR"] = server.instruct["host"] + ":" + server.instruct["listen"];
     env["REMOTE_PORT"] = server.instruct["listen"];
 
     std::string command;
@@ -285,13 +291,32 @@ void Handler::handleCGI()
     }
 }
 
-void Handler::handleGet()
+void Handler::handleGet(Server serv, int j)
 {
     struct stat buffer;
-    const std::string& uri = "." + _request.getUri();
+    std::string root;
+    std::string index;
 
-    printf("%s\n", uri.c_str());
-	if (stat(uri.c_str(), &buffer) == 0)
+    if (!serv.instruct["root"].empty())
+        root = serv.instruct["root"];
+    else if (!serv.locations[j].instruct["root"].empty())
+        root = serv.locations[j].instruct["root"];
+
+    if (!serv.locations[j].instruct["index"].empty())
+        index = serv.locations[j].instruct["index"];
+    else if (!serv.instruct["index"].empty())
+        index = serv.instruct["index"];
+
+    std::string uri = root + _request.getUri();
+    std::string uri_index;
+
+    if (!_request.getUri().empty() && _request.getUri()[_request.getUri().size()] == '/')
+        uri_index = root + _request.getUri() + index;
+    else if (serv.locations[j].path == "/" && _request.getUri() == "/")
+        uri_index = root + "/" + index;
+    else
+        uri_index = "";
+    if (stat(uri.c_str(), &buffer) == 0 && S_ISREG(buffer.st_mode))
     {
         setStatusCode(200);
         std::ifstream file(uri.c_str());
@@ -299,12 +324,12 @@ void Handler::handleGet()
         {
             std::ostringstream ss;
             ss << file.rdbuf();
-			std::ostringstream len;
-			len << ss.str().size();
-			_response = "HTTP/1.1 200 OK\r\n"
-						"Content-Type: text/html\r\n"
-						"Content-Length: " + len.str() + "\r\n"
-						"\r\n" + ss.str();
+            std::ostringstream len;
+            len << ss.str().size();
+            _response = "HTTP/1.1 200 OK\r\n"
+                        "Content-Type: text/html\r\n"
+                        "Content-Length: " + len.str() + "\r\n"
+                        "\r\n" + ss.str();
         }
         else
         {
@@ -312,16 +337,62 @@ void Handler::handleGet()
             _response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 21\r\n\r\nInternal Server Error";
         }
     }
+    else if (!uri_index.empty() && stat(uri_index.c_str(), &buffer) == 0 && S_ISREG(buffer.st_mode))
+    {
+        setStatusCode(200);
+        std::ifstream file(uri_index.c_str());
+        if (file)
+        {
+            std::ostringstream ss;
+            ss << file.rdbuf();
+            std::ostringstream len;
+            len << ss.str().size();
+            _response = "HTTP/1.1 200 OK\r\n"
+                        "Content-Type: text/html\r\n"
+                        "Content-Length: " + len.str() + "\r\n"
+                        "\r\n" + ss.str();
+        }
+        else
+        {
+            setStatusCode(500);
+            _response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 21\r\n\r\nInternal Server Error";
+        }
+    }
+    else if (serv.locations[j].instruct["autoindex"] == "on" && serv.locations[j].path == _request.getUri())
+    {
+        setStatusCode(200);
+        std::string autoindexHtml = "<html><body><h1>Directory Listing</h1><ul>";
+        DIR *dir = opendir(("." + _request.getUri()).c_str());
+        if (dir)
+        {
+            struct dirent *entry;
+            while ((entry = readdir(dir)) != NULL)
+            {
+                if (entry->d_name[0] != '.')
+                {
+                    autoindexHtml += "<li><a href=\"" + std::string(entry->d_name) + "\">" + std::string(entry->d_name) + "</a></li>";
+                }
+            }
+            closedir(dir);
+        }
+        autoindexHtml += "</ul></body></html>";
+        _response = "HTTP/1.1 200 OK\r\n"
+                        "Content-Type: text/html\r\n"
+                        "Content-Length: " + sizeToString(autoindexHtml.size()) + "\r\n"
+                        "\r\n" + autoindexHtml;
+    }
     else
     {
         setStatusCode(404);
-        std::ifstream errorFile("./html/error.html");
+        std::ifstream errorFile("./html/404.html");
+        std::cout << serv.locations[j].path << std::endl;
+        std::cout << _request.getUri() << std::endl;
         if (errorFile)
         {
             std::ostringstream ss;
             ss << errorFile.rdbuf();
-			std::ostringstream len;
-			len << ss.str().size();
+            std::ostringstream len;
+            len << ss.str().size();
             _response = "HTTP/1.1 404 Not Found 3\r\n"
                         "Content-Type: text/html\r\n"
                         "Content-Length: " + len.str() + "\r\n"
@@ -421,7 +492,7 @@ void Handler::handlePost(std::string& path)
     
     for (size_t i = 0; i < _configParser.getServers().size(); i++) {
         server = _configParser.getServers()[i];
-        if (_request.getHeader("Host") == server.instruct["host"] || 
+        if (_request.getHeader("Host") == server.instruct["host"] + ":" + server.instruct["listen"]  || 
             _request.getHeader("Host") == server.instruct["server_name"]) {
             for (size_t j = 0; j < server.locations.size(); j++) {
                 if (server.locations[j].path == path) {

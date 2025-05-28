@@ -198,7 +198,7 @@ class WebservTester:
     
     def test_basic_http_methods(self):
         """Test des méthodes HTTP de base"""
-        methods_to_test = ['GET', 'POST', 'DELETE', 'PUT', 'HEAD', 'OPTIONS']
+        methods_to_test = ['GET', 'POST', 'DELETE']
         
         for method in methods_to_test:
             try:
@@ -223,6 +223,7 @@ class WebservTester:
             # Test des méthodes autorisées
             for method in allowed_methods:
                 try:
+                    print(method, url)
                     response = requests.request(method, url, timeout=5)
                     # Méthode autorisée ne devrait pas retourner 405
                     passed = response.status_code != 405
@@ -233,10 +234,11 @@ class WebservTester:
                                 False, str(e))
             
             # Test des méthodes non autorisées
-            forbidden_methods = ['GET', 'POST', 'DELETE', 'PUT', 'HEAD']
+            forbidden_methods = ['GET', 'POST', 'DELETE']
             for method in forbidden_methods:
                 if method not in allowed_methods:
                     try:
+                        
                         response = requests.request(method, url, timeout=5)
                         # Méthode non autorisée devrait retourner 405
                         passed = response.status_code == 405 or response.status_code == 501

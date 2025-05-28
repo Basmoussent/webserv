@@ -27,7 +27,7 @@ public:
     ~Handler();
 
     void process();
-    void handleGet();
+    void handleGet(Server serv, int j);
     void handlePost(std::string& path);
     void handleDelete(std::string &path);
     void handleCGI();
