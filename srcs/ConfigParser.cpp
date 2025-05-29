@@ -4,20 +4,19 @@ ConfigParser::ConfigParser()
 	: _blockDepth(0), _inServer(false), _inLocation(false)
 {
 	_keywords["listen"] = 1;
-	_keywords["server_name"] = 0;
 	_keywords["root"] = 1;
 	_keywords["host"] = 1;
 	_keywords["index"] = 1;
+	_keywords["location"] = 1;
+	_keywords["server_name"] = 0;
 	_keywords["autoindex"] = 0;
 	_keywords["error_page"] = 0;
 	_keywords["client_max_body_size"] = 0;
-	//limit_except ?
-	_keywords["allow_methods"] = 1;
-	_keywords["cgi"] = 1;
-	_keywords["cgi_path"] = 1;
-	_keywords["cgi_ext"] = 1;
+	_keywords["allow_methods"] = 0;
+	_keywords["cgi"] = 0;
+	_keywords["cgi_path"] = 0;
+	_keywords["cgi_ext"] = 0;
 	_keywords["upload_dir"] = 0;
-	_keywords["location"] = 1;
 }
 
 ConfigParser::~ConfigParser() {}
@@ -25,7 +24,6 @@ ConfigParser::~ConfigParser() {}
 bool ConfigParser::parseFile(const std::string& filename)
 {
 	std::ifstream file;
-	//check si c'est un dossier !!!!
 	if (!openFile(filename, file))
 	{
 		std::cerr << "Error: unable to open file." << std::endl;
@@ -52,6 +50,7 @@ bool ConfigParser::parseFile(const std::string& filename)
 		std::cerr << "Error: block not closed correctly." << std::endl;
 		return false;
 	}
+
 	return true;
 }
 
@@ -107,7 +106,7 @@ bool ConfigParser::handleServerBlock()
 {
 	if (_blockDepth != 0)
 	{
-		std::cerr << "zError: misplaced 'server' block." << std::endl;
+		std::cerr << "Error: misplaced 'server' block." << std::endl;
 		return false;
 	}
 	_currentServer = Server();
@@ -137,7 +136,19 @@ bool ConfigParser::handleClosingBrace()
 {
 	if (_blockDepth == 2)
 	{
-		_currentServer.locations.push_back(_currentLocation);
+		bool replaced = false;
+		for (size_t i = 0; i < _currentServer.locations.size(); ++i)
+		{
+			if (_currentServer.locations[i].path == _currentLocation.path)
+			{
+				_currentServer.locations[i] = _currentLocation;
+				replaced = true;
+				break;
+			}
+		}
+		if (!replaced) {
+			_currentServer.locations.push_back(_currentLocation);
+		}
 		_inLocation = false;
 		_blockDepth = 1;
 	}
@@ -167,11 +178,6 @@ bool ConfigParser::assignKeyValue(const std::string& key, std::istringstream& is
 	if (key.empty() || value.empty())
 	{
 		std::cerr << "Error: the directive '" << key << "' must have a value." << std::endl;
-		return false;
-	}
-	if (!isValueValid(key, value))
-	{
-		std::cerr << "Error: invalid value for '" << key << "' : '" << value << "'" << std::endl;
 		return false;
 	}
 	if (_inLocation)
@@ -217,4 +223,29 @@ std::string ConfigParser::trim(const std::string& s)
 	if (start == std::string::npos || end == std::string::npos)
 		return "";
 	return s.substr(start, end - start + 1);
+}
+void ConfigParser::printServers() const
+{
+	for (std::size_t s = 0; s < _servers.size(); ++s)
+	{
+		std::cout << "\n--- SERVER " << s + 1 << " ---" << std::endl;
+
+		std::map<std::string, std::string>::const_iterator it;
+		for (it = _servers[s].instruct.begin(); it != _servers[s].instruct.end(); ++it)
+		{
+			std::cout << "  " << it->first << " : " << it->second << std::endl;
+		}
+
+		for (std::size_t i = 0; i < _servers[s].locations.size(); ++i)
+		{
+			std::cout << "\n  Location: " << _servers[s].locations[i].path << std::endl;
+
+			std::map<std::string, std::string>::const_iterator lit;
+			for (lit = _servers[s].locations[i].instruct.begin();
+					lit != _servers[s].locations[i].instruct.end(); ++lit)
+				{
+				std::cout << "    " << lit->first << " : " << lit->second << std::endl;
+			}
+		}
+	}
 }

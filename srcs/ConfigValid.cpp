@@ -1,40 +1,74 @@
 #include "../includes/ConfigParser.hpp"
 
-bool ConfigParser::isValueValid(const std::string& key, const std::string& value) const
+bool ConfigParser::validateConfig() const
+{
+	for (size_t s = 0; s < _servers.size(); ++s)
+	{
+		const Server& srv = _servers[s];
+		Location emptyLoc;
+		// Validation des directives du server
+		for (std::map<std::string, std::string>::const_iterator it = srv.instruct.begin();
+			 it != srv.instruct.end(); ++it)
+		{
+			if (!isValueValid(it->first, it->second, emptyLoc, srv))
+			{
+				std::cerr << "Error: invalid value for '" << it->first << "' in server block." << std::endl;
+				return false;
+			}
+		}
+		// Validation des locations
+		for (size_t l = 0; l < srv.locations.size(); ++l)
+		{
+			const Location& loc = srv.locations[l];
+			for (std::map<std::string, std::string>::const_iterator lit = loc.instruct.begin();
+				 lit != loc.instruct.end(); ++lit)
+			{
+				if (!isValueValid(lit->first, lit->second, loc, srv))
+				{
+					std::cerr << "Error: invalid value for '" << lit->first << "' in location '" << loc.path << "'." << std::endl;
+					return false;
+				}
+			}
+		}
+	}
+	return true;
+}
+
+bool ConfigParser::isValueValid(const std::string& key, const std::string& value, const Location& loc, const Server& srv) const
 {
 	if (key == "listen")
 		return isValidPort(value);
 
 	if (key == "host")
 		return isValidIP(value);
-
+		
 	if (key == "server_name")
 		return isName(value);
-
+		
 	if (key == "autoindex" || key == "cgi")
 		return (value == "on" || value == "off");
-
+		
 	if (key == "client_max_body_size")
 		return isInteger(value);
-
+		
 	if (key == "allow_methods")
 		return ValidMethods(value);
-
+		
 	if (key == "cgi_ext")
 		return isValidExtension(value);
+	
+	if (key == "root" || key == "location")
+		return isValidRoot(value);
 
 	if (key == "error_page")
-		return isValidErrorPage(value);
-
+		return isValidErrorPage(value, loc, srv);
+		
 	if (key == "index")
-		return isValidIndex(value);
+		return isValidIndex(value, loc, srv);	
 
-	if (key == "root")
-		return isValidPath(value);
-
-	if (key == "location" || key == "upload_dir" || key == "cgi_path")
-		return getPath(value);
-
+	if (key == "upload_dir" || key == "cgi_path")
+		return isValidPath(value, loc, srv);
+	
 	return true;
 }
 
@@ -53,8 +87,6 @@ bool	ConfigParser::WhatIsYourName(const std::string& name, const std::string& va
 	return false;
 }
 
-
-//correction mais a voir si je dois le mettre dans un tableau afin qu'il puisse le parcourir ou alors juste en faisant >> ca passe
 bool	ConfigParser::isName(const std::string& val) const
 {
 	std::istringstream iss(val);
@@ -78,10 +110,10 @@ bool ConfigParser::isValidExtension(const std::string& s) const
 	for (size_t i = 0; i < sizeof(ext); ++i)
 	{
 		if (s == ext[i])
-		return true;
+			return true;
 	}
 	return false;
-	
+
 }
 
 bool ConfigParser::isInteger(const std::string& s) const
@@ -89,7 +121,7 @@ bool ConfigParser::isInteger(const std::string& s) const
 	for (size_t i = 0; i < s.size(); ++i)
 	{
 		if (!isdigit(s[i]))
-		return false;
+			return false;
 	}
 	return true;
 }
@@ -97,12 +129,12 @@ bool ConfigParser::isInteger(const std::string& s) const
 bool ConfigParser::isValidPort(const std::string& s) const
 {
 	if (!isInteger(s))
-	return false;
+		return false;
 	int port;
-	
+
 	port = atoi(s.c_str());
 	if (port >= 0 && port <= 65535)
-	return true;
+		return true;
 	return false;
 }
 
@@ -111,22 +143,21 @@ bool ConfigParser::isValidIP(const std::string& ip) const
 	std::istringstream iss(ip);
 	std::string token;
 	int count = 0;
-	
+
 	while (std::getline(iss, token, '.'))
 	{
 		if (!isInteger(token))
-		return false;
+			return false;
 		int num;
-		
+
 		num = atoi(token.c_str());
 		if (num < 0 || num > 255)
-		return false;
+			return false;
 		count++;
 	}
 	return count == 4;
 }
 
-//demander ducoup si on gere l'autre "limit_except"
 bool ConfigParser::ValidMethods(const std::string& val) const
 {
 	std::istringstream iss(val);
@@ -135,41 +166,14 @@ bool ConfigParser::ValidMethods(const std::string& val) const
 	while (iss >> method)
 	{
 		if (method != "GET" && method != "POST" && method != "DELETE")
-		return false;
+			return false;
 	}
 	return true;
 }
 
-/*
-ici problemes
-1-gerer tous les path a la maniere root ou uri + le path proposer afin d'avoir un path absolue il on ne trouve pas
-2-gerer tous les path normalement sauf celui apres une location afin de trouver le path absolu comme ecrit au dessus
-
-
-root path --> root /www/var/
-
-location path --> location /upload
-
-absolute path --> /www/var/upload
-
-*/
-
-// bool ConfigParser::isValidPath(const std::string& path) const
-// {
-// 	// std::istringstream iss(path);
-// 	std::string tmp;
-// 	for ()
-	
-// 			return false;
-// 	return true;
-// }
-
-bool ConfigParser::isValidPath(const std::string& path) const
+bool ConfigParser::isValidRoot(const std::string& path) const
 {
-	std::cout << "root : " << path << std::endl;
 	size_t i = 0;
-	_keywords["root"] = 2;
-
 	if (path[0] == '.')
 		i++;
 	if (access(path.c_str(), F_OK) == 0)
@@ -177,84 +181,75 @@ bool ConfigParser::isValidPath(const std::string& path) const
 	return false;
 }
 
-bool	ConfigParser::getPath(const std::string& path) const
+std::string ConfigParser::getEffectiveRoot(const Location& loc, const Server& srv, const std::string& key) const
 {
-	// size_t i = 0;
-	// if (path[0] == '.')
-	// {
-	// 	i++;
-	// }
-	std::vector<Server> server = getServers();
-
-	
-;	std::string root;
-
-	
-	if (_keywords["root"] == 2)
-		root = 
-	}
-
+	std::map<std::string, std::string>::const_iterator it = loc.instruct.find(key);
+	if (it != loc.instruct.end())
+		return it->second;
+	it = srv.instruct.find(key);
+	if (it != srv.instruct.end())
+		return it->second;
+	return "";
 }
 
-//ici problemes au niveau du path 
-bool	ConfigParser::isValidIndex(const std::string& val) const
+bool ConfigParser::isValidPath(const std::string& path, const Location& loc, const Server& srv) const
 {
-	std::istringstream iss(val);
-	std::string index;
-	std::string path;
-	
-	while (iss >> index)
-	{
-		path = "/var/www/html/" + index;
-		//a verifier
-		// if (access(path.c_str(), F_OK) == 0)
+	if (path[0] == '.')
+		return (access(path.c_str(), F_OK) == 0);
+	std::string root = getEffectiveRoot(loc, srv, "root");
+	std::string fullPath = root;
+	if (!fullPath.empty() && fullPath[fullPath.size() - 1] != '/')
+		fullPath += "/";
+	fullPath += path;
+	std::cout << "fullPath : " << fullPath << std::endl;
+	if (access(fullPath.c_str(), F_OK) == 0)
 		return true;
-	}
 	return false;
 }
 
-//ici problemes
-bool ConfigParser::isValidErrorPage(const std::string& val) const
+bool ConfigParser::isValidErrorPage(const std::string& val, const Location& loc, const Server& srv) const
 {
-	// std::istringstream iss(val);
-	// std::string codeStr;
-	// std::string path;
-	
-	// iss >> codeStr >> path;
-	// if (!isInteger(codeStr))
-	// 	return false;
-	// int code;
-	
-	// code = atoi(codeStr.c_str());
-	// if ((code >= 400 && code < 600) && !path.empty() && access(path.c_str(), F_OK) == 0)
-	// 	return true;
-	(void) val;
-	return true;
+	std::istringstream iss(val);
+	std::string code;
+	std::string path;
+
+	iss >> code >> path;
+	if (!isInteger(code))
+		return false;
+	int nb = atoi(code.c_str());
+	if (nb < 400 && nb >= 600)
+		return false;
+
+	if (path[0] == '.')
+		return (access(path.c_str(), F_OK) == 0);
+
+	std::string error = getEffectiveRoot(loc, srv, "root");
+	std::string fullPath = error;
+	if (!fullPath.empty() && fullPath[fullPath.size() - 1] != '/')
+		fullPath += "/";
+	fullPath += path;
+	if (access(fullPath.c_str(), F_OK) == 0)
+		return true;
+	return false;
 }
 
-// fonction que je vais enlever permet seulement de faire les checks
-void ConfigParser::printServers() const
+bool	ConfigParser::isValidIndex(const std::string& val, const Location& loc, const Server& srv) const
 {
-	for (std::size_t s = 0; s < _servers.size(); ++s)
+	std::istringstream iss(val);
+	std::string path;
+
+	while (iss >> path) 
 	{
-		std::cout << "\n--- SERVER " << s + 1 << " ---" << std::endl;
-		
-		std::map<std::string, std::string>::const_iterator it;
-		for (it = _servers[s].instruct.begin(); it != _servers[s].instruct.end(); ++it)
-		{
-			std::cout << "  " << it->first << " : " << it->second << std::endl;
-		}
-		
-		for (std::size_t i = 0; i < _servers[s].locations.size(); ++i)
-		{
-			std::cout << "\n  Location: " << _servers[s].locations[i].path << std::endl;
-			
-			std::map<std::string, std::string>::const_iterator lit;
-			for (lit = _servers[s].locations[i].instruct.begin();
-			lit != _servers[s].locations[i].instruct.end(); ++lit)
-			{
-				std::cout << "    " << lit->first << " : " << lit->second << std::endl;
-			}
-		}
+		if (path[0] == '.')
+			return (access(path.c_str(), F_OK) == 0);
+
+		std::string error = getEffectiveRoot(loc, srv, "root");
+		std::string fullPath = error;
+		if (!fullPath.empty() && fullPath[fullPath.size() - 1] != '/')
+			fullPath += "/";
+		fullPath += path;
+		if (access(fullPath.c_str(), F_OK) == 0)
+			return true;
 	}
+	return false;
 }
