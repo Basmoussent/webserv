@@ -6,7 +6,7 @@ bool ConfigParser::validateConfig() const
 	{
 		const Server& srv = _servers[s];
 		Location emptyLoc;
-		// Validation des directives du server
+		
 		for (std::map<std::string, std::string>::const_iterator it = srv.instruct.begin();
 			 it != srv.instruct.end(); ++it)
 		{
@@ -16,7 +16,6 @@ bool ConfigParser::validateConfig() const
 				return false;
 			}
 		}
-		// Validation des locations
 		for (size_t l = 0; l < srv.locations.size(); ++l)
 		{
 			const Location& loc = srv.locations[l];
