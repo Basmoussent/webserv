@@ -7,7 +7,7 @@ ConfigParser::ConfigParser()
 	_keywords["root"] = 1;
 	_keywords["host"] = 1;
 	_keywords["index"] = 1;
-	_keywords["location"] = 1;
+	_keywords["location"] = 0;
 	_keywords["server_name"] = 0;
 	_keywords["autoindex"] = 0;
 	_keywords["error_page"] = 0;
@@ -17,6 +17,7 @@ ConfigParser::ConfigParser()
 	_keywords["cgi_path"] = 0;
 	_keywords["cgi_ext"] = 0;
 	_keywords["upload_dir"] = 0;
+	_keywords["return"] = 0;
 }
 
 ConfigParser::~ConfigParser() {}
@@ -44,6 +45,11 @@ bool ConfigParser::parseFile(const std::string& filename)
 			line.erase(line.size() - 1);
 		if (!parseLine(line))
 			return false;
+	}
+	if (!checkMinimumConfig()) 
+	{
+		std::cerr << "Error: minimum configuration not met." << std::endl;
+		return false;
 	}
 	if (_blockDepth != 0)
 	{
@@ -93,7 +99,7 @@ bool ConfigParser::parseLine(const std::string& line)
 	{
 		if ((_inServer == false && _blockDepth == 1) || (_inLocation == false && _blockDepth == 2))
 		{
-			std::cout << "Error: no opening bracket" << std::endl;
+			std::cerr << "Error: no opening bracket" << std::endl;
 			return false;
 		}
 		if (!assignKeyValue(word, iss))
@@ -101,6 +107,7 @@ bool ConfigParser::parseLine(const std::string& line)
 	}
 	return true;
 }
+
 
 bool ConfigParser::handleServerBlock()
 {
@@ -127,7 +134,7 @@ bool ConfigParser::handleLocationBlock(std::istringstream& iss)
 	_currentLocation.path = path;
 	iss >> path;
 	if (path == "{") 
-		_inLocation = true;
+	_inLocation = true;
 	_blockDepth = 2;
 	return true;
 }
@@ -166,6 +173,26 @@ bool ConfigParser::handleClosingBrace()
 	return true;
 }
 
+bool ConfigParser::checkMinimumConfig() const
+{
+	for (size_t s = 0; s < _servers.size(); ++s)
+	{
+		const Server& srv = _servers[s];
+		for (std::map<std::string, int>::const_iterator it = _keywords.begin(); it != _keywords.end(); ++it)
+		{
+			if (it->second == 1)
+			{
+				if (srv.instruct.find(it->first) == srv.instruct.end())
+				{
+					std::cerr << "Error: missing required directive '" << it->first << "' in server block " << s + 1 << "." << std::endl;
+					return false;
+				}
+			}
+		}
+	}
+	return true;
+}
+
 bool ConfigParser::assignKeyValue(const std::string& key, std::istringstream& iss)
 {
 	std::string value, word;
@@ -185,67 +212,4 @@ bool ConfigParser::assignKeyValue(const std::string& key, std::istringstream& is
 	else if (_inServer)
 		_currentServer.instruct[key] = value;
 	return true;
-}
-
-std::string ConfigParser::getInstruct(const std::string& key, const Server server) const
-{
-	std::map<std::string, std::string>::const_iterator it = server.instruct.find(key);
-	if (it != server.instruct.end())
-		return it->second;
-	return "";
-}
-
-const std::vector<Server>& ConfigParser::getServers() const
-{
-	return _servers;
-}
-
-const Server& ConfigParser::getServerByPort(int port) const
-{
-	for (std::size_t i = 0; i < _servers.size(); ++i)
-	{
-		std::map<std::string, std::string>::const_iterator it = _servers[i].instruct.find("listen");
-		if (it != _servers[i].instruct.end())
-		{
-			int i;
-			sscanf(it->second.c_str(), "%d", &i);
-			if (i == port)
-				return _servers[i];
-		}
-	}
-	throw std::runtime_error("Server not found for the given port.");
-}
-
-std::string ConfigParser::trim(const std::string& s)
-{
-	size_t start = s.find_first_not_of(" \t\r\n");
-	size_t end = s.find_last_not_of(" \t\r\n");
-	if (start == std::string::npos || end == std::string::npos)
-		return "";
-	return s.substr(start, end - start + 1);
-}
-void ConfigParser::printServers() const
-{
-	for (std::size_t s = 0; s < _servers.size(); ++s)
-	{
-		std::cout << "\n--- SERVER " << s + 1 << " ---" << std::endl;
-
-		std::map<std::string, std::string>::const_iterator it;
-		for (it = _servers[s].instruct.begin(); it != _servers[s].instruct.end(); ++it)
-		{
-			std::cout << "  " << it->first << " : " << it->second << std::endl;
-		}
-
-		for (std::size_t i = 0; i < _servers[s].locations.size(); ++i)
-		{
-			std::cout << "\n  Location: " << _servers[s].locations[i].path << std::endl;
-
-			std::map<std::string, std::string>::const_iterator lit;
-			for (lit = _servers[s].locations[i].instruct.begin();
-					lit != _servers[s].locations[i].instruct.end(); ++lit)
-				{
-				std::cout << "    " << lit->first << " : " << lit->second << std::endl;
-			}
-		}
-	}
 }
