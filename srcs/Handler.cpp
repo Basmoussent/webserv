@@ -40,16 +40,10 @@ void Handler::process()
         size_t i = 0;
         Server server;
 
-        if (_configParser.getServers().empty())
+        if (_configParser.getServers().empty() || _configParser.getServers()[0].locations.empty())
         {
             setStatusCode(500);
-            _response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 21\r\n\r\nInternal Server Error";
-            return;
-        }
-        if (_configParser.getServers()[0].locations.empty())
-        {
-            setStatusCode(500);
-            _response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 21\r\n\r\nInternal Server Error";
+            _response = buildResponse(500, "Internal Server Error", "text/plain");
             return;
         }
         for (i = 0; i < _configParser.getServers().size(); i++)
@@ -61,7 +55,7 @@ void Handler::process()
         if (i == _configParser.getServers().size())
         {
             setStatusCode(404);
-            _response = "HTTP/1.1 404 Not Found 9\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nNot Found";
+            _response = buildResponse(404, "Not Found", "text/plain");
             return;
         }
         bool locationFound = false;
@@ -73,8 +67,14 @@ void Handler::process()
                 std::string allowedMethods = server.locations[j].instruct["allow_methods"];
                 if (allowedMethods.find(_request.getMethod()) == std::string::npos)
                 {
+                    if (_request.getMethod() != "GET" &&  _request.getMethod() != "POST" && _request.getMethod() != "DELETE")
+                    {
+                        setStatusCode(501);
+                        _response = buildResponse(501, "Method Not Allowed", "text/plain");
+                        return;
+                    }
                     setStatusCode(405);
-                    _response = "HTTP/1.1 405 Method Not Allowed\r\nContent-Type: text/plain\r\nContent-Length: 19\r\n\r\nMethod Not Allowed";
+                    _response = buildResponse(405, "Method Not Allowed", "text/plain");
                     return;
                 }
                 locationFound = true;
@@ -107,9 +107,8 @@ void Handler::process()
 	}
 	else
 	{
-		_response = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\nContent-Length: 11\r\n\r\nBad Request";
 		setStatusCode(400);
-		setValid(false);
+		_response = buildResponse(400, "Bad Request", "text/plain");
 	}
 }
 
@@ -287,8 +286,73 @@ void Handler::handleCGI()
                    "\r\n" + output;
     } else {
         setStatusCode(500);
-        _response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 21\r\n\r\nInternal Server Error";
+        _response = buildResponse(500, "Internal Server Error", "text/plain");
     }
+}
+
+std::string Handler::getMimeType(const std::string& path) const {
+    std::string extension = path.substr(path.find_last_of(".") + 1);
+    std::map<std::string, std::string> mimeTypes;
+    
+    mimeTypes["html"] = "text/html";
+    mimeTypes["htm"] = "text/html";
+    mimeTypes["css"] = "text/css";
+    mimeTypes["js"] = "application/javascript";
+    mimeTypes["json"] = "application/json";
+    mimeTypes["png"] = "image/png";
+    mimeTypes["jpg"] = "image/jpeg";
+    mimeTypes["jpeg"] = "image/jpeg";
+    mimeTypes["gif"] = "image/gif";
+    mimeTypes["ico"] = "image/x-icon";
+    mimeTypes["txt"] = "text/plain";
+    mimeTypes["pdf"] = "application/pdf";
+    mimeTypes["xml"] = "application/xml";
+    mimeTypes["zip"] = "application/zip";
+    
+    std::map<std::string, std::string>::iterator it = mimeTypes.find(extension);
+    if (it != mimeTypes.end()) {
+        return it->second;
+    }
+    return "application/octet-stream";
+}
+
+std::string Handler::buildResponse(int statusCode, const std::string& content, const std::string& contentType) const {
+    std::string statusText;
+    switch (statusCode) {
+        case 200: statusText = "OK"; break;
+        case 201: statusText = "Created"; break;
+        case 204: statusText = "No Content"; break;
+        case 301: statusText = "Moved Permanently"; break;
+        case 400: statusText = "Bad Request"; break;
+        case 401: statusText = "Unauthorized"; break;
+        case 403: statusText = "Forbidden"; break;
+        case 404: statusText = "Not Found"; break;
+        case 405: statusText = "Method Not Allowed"; break;
+        case 500: statusText = "Internal Server Error"; break;
+        default: statusText = "Unknown";
+    }
+    
+    std::string response = "HTTP/1.1 " + intToString(statusCode) + " " + statusText + "\r\n";
+    response += "Content-Type: " + contentType + "\r\n";
+    response += "Content-Length: " + sizeToString(content.length()) + "\r\n";
+    if (statusCode == 405) 
+        response += "Allow: GET, POST, DELETE\r\n";
+    response += "Server: webserv/1.0\r\n";
+    response += "Connection: Keep-Alive\r\n";
+    response += "Accept-Ranges: bytes\r\n";
+    response += "Date: " + getCurrentDate() + "\r\n";
+    response += "\r\n";
+    response += content;
+    
+    return response;
+}
+
+std::string Handler::getCurrentDate() const {
+    char buffer[100];
+    time_t now = time(0);
+    struct tm tm = *gmtime(&now);
+    strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", &tm);
+    return std::string(buffer);
 }
 
 void Handler::handleGet(Server serv, int j)
@@ -296,113 +360,141 @@ void Handler::handleGet(Server serv, int j)
     struct stat buffer;
     std::string root;
     std::string index;
-
+    std::string uri = _request.getUri();
+    
     if (!serv.instruct["root"].empty())
         root = serv.instruct["root"];
     else if (!serv.locations[j].instruct["root"].empty())
         root = serv.locations[j].instruct["root"];
-
+    else {
+        setStatusCode(500);
+        _response = buildResponse(500, "Internal Server Error", "text/plain");
+        return;
+    }
+    if (root.substr(0, 2) == "./") {
+        root = root.substr(2);
+    }
     if (!serv.locations[j].instruct["index"].empty())
         index = serv.locations[j].instruct["index"];
     else if (!serv.instruct["index"].empty())
         index = serv.instruct["index"];
-
-    std::string uri = root + _request.getUri();
-    std::string uri_index;
-
-    if (!_request.getUri().empty() && _request.getUri()[_request.getUri().size()] == '/')
-        uri_index = root + _request.getUri() + index;
-    else if (serv.locations[j].path == "/" && _request.getUri() == "/")
-        uri_index = root + "/" + index;
     else
-        uri_index = "";
-    if (stat(uri.c_str(), &buffer) == 0 && S_ISREG(buffer.st_mode))
-    {
-        setStatusCode(200);
-        std::ifstream file(uri.c_str());
-        if (file)
-        {
-            std::ostringstream ss;
-            ss << file.rdbuf();
-            std::ostringstream len;
-            len << ss.str().size();
-            _response = "HTTP/1.1 200 OK\r\n"
-                        "Content-Type: text/html\r\n"
-                        "Content-Length: " + len.str() + "\r\n"
-                        "\r\n" + ss.str();
-        }
-        else
-        {
-            setStatusCode(500);
-            _response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 21\r\n\r\nInternal Server Error";
-        }
-    }
-    else if (!uri_index.empty() && stat(uri_index.c_str(), &buffer) == 0 && S_ISREG(buffer.st_mode))
-    {
-        setStatusCode(200);
-        std::ifstream file(uri_index.c_str());
-        if (file)
-        {
-            std::ostringstream ss;
-            ss << file.rdbuf();
-            std::ostringstream len;
-            len << ss.str().size();
-            _response = "HTTP/1.1 200 OK\r\n"
-                        "Content-Type: text/html\r\n"
-                        "Content-Length: " + len.str() + "\r\n"
-                        "\r\n" + ss.str();
-        }
-        else
-        {
-            setStatusCode(500);
-            _response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 21\r\n\r\nInternal Server Error";
-        }
-    }
-    else if (serv.locations[j].instruct["autoindex"] == "on" && serv.locations[j].path == _request.getUri())
-    {
-        setStatusCode(200);
-        std::string autoindexHtml = "<html><body><h1>Directory Listing</h1><ul>";
-        DIR *dir = opendir(("." + _request.getUri()).c_str());
-        if (dir)
-        {
-            struct dirent *entry;
-            while ((entry = readdir(dir)) != NULL)
-            {
-                if (entry->d_name[0] != '.')
-                {
-                    autoindexHtml += "<li><a href=\"" + std::string(entry->d_name) + "\">" + std::string(entry->d_name) + "</a></li>";
-                }
-            }
-            closedir(dir);
-        }
-        autoindexHtml += "</ul></body></html>";
-        _response = "HTTP/1.1 200 OK\r\n"
-                        "Content-Type: text/html\r\n"
-                        "Content-Length: " + sizeToString(autoindexHtml.size()) + "\r\n"
-                        "\r\n" + autoindexHtml;
-    }
-    else
-    {
+        index = "index.html";
+    std::string fullPath = root + (uri[0] == '/' ? uri : "/" + uri);
+    std::cout << "Full path: " << fullPath << std::endl;
+    if (stat(fullPath.c_str(), &buffer) != 0) {
         setStatusCode(404);
-        std::ifstream errorFile("./html/404.html");
-        std::cout << serv.locations[j].path << std::endl;
-        std::cout << _request.getUri() << std::endl;
-        if (errorFile)
-        {
-            std::ostringstream ss;
-            ss << errorFile.rdbuf();
-            std::ostringstream len;
-            len << ss.str().size();
-            _response = "HTTP/1.1 404 Not Found 3\r\n"
-                        "Content-Type: text/html\r\n"
-                        "Content-Length: " + len.str() + "\r\n"
-                        "\r\n" + ss.str();
-        }
-        else
-        {
-            _response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nNot Found";
-        }
+        std::string errorPage = getErrorPage(404);
+        _response = buildResponse(404, errorPage, "text/html");
+        return;
     }
+    if (S_ISDIR(buffer.st_mode)) {
+        if (uri[uri.length() - 1] != '/') {
+            setStatusCode(301);
+            std::string location = "Location: " + uri + "/\r\n";
+            _response = buildResponse(301, "", "text/plain");
+            _response.insert(_response.find("\r\n\r\n"), location);
+            return;
+        }
+        std::string indexPath = fullPath + index;
+        if (stat(indexPath.c_str(), &buffer) != 0) {
+            if (serv.locations[j].instruct["autoindex"] == "on") {
+                std::string autoindexHtml = generateDirectoryListing(fullPath, uri);
+                setStatusCode(200);
+                _response = buildResponse(200, autoindexHtml, "text/html");
+            } else {
+                setStatusCode(403);
+                std::string errorPage = getErrorPage(403);
+                _response = buildResponse(403, errorPage, "text/html");
+            }
+            return;
+        }
+        fullPath = indexPath;
+    }
+    std::ifstream file(fullPath.c_str(), std::ios::binary);
+    if (!file) {
+        setStatusCode(500);
+        _response = buildResponse(500, "Internal Server Error", "text/plain");
+        return;
+    }
+    std::ostringstream ss;
+    ss << file.rdbuf();
+    std::string content = ss.str();
+    std::string contentType = getMimeType(fullPath);
+    setStatusCode(200);
+    _response = buildResponse(200, content, contentType);
+}
+
+std::string Handler::generateDirectoryListing(const std::string& path, const std::string& uri) const {
+    std::string html = "<!DOCTYPE html>\n<html>\n<head>\n";
+    html += "<title>Index of " + uri + "</title>\n";
+    html += "<style>\n";
+    html += "body { font-family: Arial, sans-serif; margin: 20px; }\n";
+    html += "h1 { color: #333; }\n";
+    html += "table { border-collapse: collapse; width: 100%; }\n";
+    html += "th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }\n";
+    html += "tr:hover { background-color: #f5f5f5; }\n";
+    html += "a { text-decoration: none; color: #0066cc; }\n";
+    html += "a:hover { text-decoration: underline; }\n";
+    html += "</style>\n</head>\n<body>\n";
+    html += "<h1>Index of " + uri + "</h1>\n";
+    html += "<table>\n<tr><th>Name</th><th>Last modified</th><th>Size</th></tr>\n";
+
+    DIR* dir = opendir(path.c_str());
+    if (dir) {
+        struct dirent* entry;
+        while ((entry = readdir(dir)) != NULL) {
+            if (entry->d_name[0] == '.') continue;
+            
+            std::string fullPath = path + "/" + entry->d_name;
+            struct stat st;
+            if (stat(fullPath.c_str(), &st) != 0) continue;
+
+            std::string name = entry->d_name;
+            if (S_ISDIR(st.st_mode)) name += "/";
+
+            char date[100];
+            strftime(date, sizeof(date), "%d-%b-%Y %H:%M", localtime(&st.st_mtime));
+            
+            std::string size = S_ISDIR(st.st_mode) ? "-" : sizeToString(st.st_size);
+            
+            html += "<tr><td><a href=\"" + name + "\">" + name + "</a></td>";
+            html += "<td>" + std::string(date) + "</td>";
+            html += "<td>" + size + "</td></tr>\n";
+        }
+        closedir(dir);
+    }
+
+    html += "</table>\n</body>\n</html>";
+    return html;
+}
+
+std::string Handler::getErrorPage(int statusCode) const {
+    std::string errorPage = "<!DOCTYPE html>\n<html>\n<head>\n";
+    errorPage += "<title>Error " + intToString(statusCode) + "</title>\n";
+    errorPage += "<style>\n";
+    errorPage += "body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }\n";
+    errorPage += "h1 { color: #333; }\n";
+    errorPage += "p { color: #666; }\n";
+    errorPage += "</style>\n</head>\n<body>\n";
+    errorPage += "<h1>Error " + intToString(statusCode) + "</h1>\n";
+    
+    switch (statusCode) {
+        case 403:
+            errorPage += "<p>Access Forbidden</p>\n";
+            break;
+        case 404:
+            errorPage += "<p>Page Not Found</p>\n";
+            break;
+        case 500:
+            errorPage += "<p>Internal Server Error</p>\n";
+            break;
+        default:
+            errorPage += "<p>An error occurred</p>\n";
+    }
+    
+    errorPage += "</body>\n</html>";
+    return errorPage;
 }
 
 std::string Handler::getUploadDirectory(const Server& server, const Location& location) const {
@@ -416,7 +508,7 @@ std::string Handler::getUploadDirectory(const Server& server, const Location& lo
         return it->second;
     }
     
-    return "./uploads_default";
+    return "./html/uploads_default";
 }
 
 bool Handler::handleFileUpload(const std::string& uploadDir, const std::string& filename, const std::string& content) {
@@ -482,7 +574,7 @@ void Handler::handlePost(std::string& path)
     if (_request.getUri() != path && _request.getUri() != (pathCheck + "/"))
     {
         setStatusCode(500);
-        _response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 21\r\n\r\nInternal Server Error";
+        _response = buildResponse(500, "Internal Server Error", "text/plain");
         return;
     }
 
@@ -507,7 +599,7 @@ void Handler::handlePost(std::string& path)
 
     if (!found) {
         setStatusCode(404);
-        _response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nNot Found";
+        _response = buildResponse(404, "Not Found", "text/plain");
         return;
     }
 
@@ -518,7 +610,7 @@ void Handler::handlePost(std::string& path)
         size_t boundaryPos = contentType.find("boundary=");
         if (boundaryPos == std::string::npos) {
             setStatusCode(400);
-            _response = "HTTP/1.1 400 Bad Request - No boundary found\r\nContent-Type: text/plain\r\nContent-Length: 11\r\n\r\nBad Request";
+            _response = buildResponse(400, "Bad Request - No boundary found", "text/plain");
             return;
         }
         
@@ -528,7 +620,7 @@ void Handler::handlePost(std::string& path)
         
         if (filename.empty() || content.empty()) {
             setStatusCode(400);
-            _response = "HTTP/1.1 400 Bad Request - Empty filename or content\r\nContent-Type: text/plain\r\nContent-Length: 11\r\n\r\nBad Request";
+            _response = buildResponse(400, "Bad Request - Empty filename or content", "text/plain");
             return;
         }
 
@@ -536,20 +628,29 @@ void Handler::handlePost(std::string& path)
         if (handleFileUpload(uploadDir, filename, content)) {
             setStatusCode(201);
             std::string location = "Location: " + uploadDir + "/" + filename;
-            _response = "HTTP/1.1 201 Created\r\nContent-Type: text/plain\r\nContent-Length: " + sizeToString(location.length()) + "\r\n\r\n" + location;
+            _response = buildResponse(201, location, "text/plain");
         } else {
             setStatusCode(500);
-            _response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 21\r\n\r\nInternal Server Error";
+            _response = buildResponse(500, "Internal Server Error", "text/plain");
         }
         return;
     }
 
-    std::string pathDir = "." + path;
+    std::string logBaseDir = "./log";
     struct stat st;
-    if (stat(pathDir.c_str(), &st) != 0) {
-        if (mkdir(pathDir.c_str(), 0755) != 0) {
+    if (stat(logBaseDir.c_str(), &st) != 0) {
+        if (mkdir(logBaseDir.c_str(), 0755) != 0) {
             setStatusCode(500);
-            _response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 21\r\n\r\nInternal Server Error";
+            _response = buildResponse(500, "Internal Server Error - Could not create log directory", "text/plain");
+            return;
+        }
+    }
+
+    std::string logPath = logBaseDir + path;
+    if (stat(logPath.c_str(), &st) != 0) {
+        if (mkdir(logPath.c_str(), 0755) != 0) {
+            setStatusCode(500);
+            _response = buildResponse(500, "Internal Server Error - Could not create log subdirectory", "text/plain");
             return;
         }
     }
@@ -557,7 +658,7 @@ void Handler::handlePost(std::string& path)
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
     std::stringstream filename;
-    filename << pathDir << "/post_"
+    filename << logPath << "/post_"
              << (t->tm_year + 1900)
              << std::setw(2) << std::setfill('0') << t->tm_mon + 1
              << std::setw(2) << std::setfill('0') << t->tm_mday
@@ -568,17 +669,27 @@ void Handler::handlePost(std::string& path)
              << ".log";
 
     std::string filepath = filename.str();
-    std::cout << "File path: " << filepath << std::endl;
+    std::cout << "Log file path: " << filepath << std::endl;
+    
     std::ofstream file(filepath.c_str(), std::ios::out | std::ios::trunc);
+    std::string tt = filepath.substr(filepath.length() - 25, filepath.length() - 1);
     if (file) {
-        file << body;
+        file << "=== POST Request Log ===\n";
+        file << "Timestamp: " <<  tt << "\n";
+        file << "Path: " << path << "\n";
+        file << "Content-Type: " << _request.getHeader("Content-Type") << "\n";
+        file << "Content-Length: " << _request.getHeader("Content-Length") << "\n";
+        file << "=== Body ===\n";
+        file << body << "\n";
+        file << "=== End of Log ===\n";
         file.close();
+        
         setStatusCode(201);
         std::string location = "Location: " + filepath;
-        _response = "HTTP/1.1 201 Created\r\nContent-Type: text/plain\r\nContent-Length: " + sizeToString(location.length()) + "\r\n\r\n" + location;
+        _response = buildResponse(201, location, "text/plain");
     } else {
         setStatusCode(500);
-        _response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 21\r\n\r\nInternal Server Error";
+        _response = buildResponse(500, "Internal Server Error - Could not write to log file", "text/plain");
     }
 }
 
@@ -590,7 +701,7 @@ void Handler::handleDelete(std::string &path)
     if (filename.empty())
     {
         setStatusCode(400);
-        _response = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\nContent-Length: 24\r\n\r\nMissing filename in body";
+        _response = buildResponse(400, "Missing filename in body", "text/plain");
         return;
     }
 
@@ -598,13 +709,13 @@ void Handler::handleDelete(std::string &path)
     {
         setStatusCode(200);
         std::string message = "File deleted successfully: " + filename;
-        _response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + sizeToString(message.length()) + "\r\n\r\n" + message;
+        _response = buildResponse(200, message, "text/plain");
     }
     else
     {
         setStatusCode(404);
         std::string message = "File not found: " + fullPath;
-        _response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: " + sizeToString(message.length()) + "\r\n\r\n" + message;
+        _response = buildResponse(404, message, "text/plain");
     }
 }
 

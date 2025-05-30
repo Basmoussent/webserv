@@ -54,6 +54,10 @@ void Request::setUri(const std::string uri)
 void Request::setHttpVersion(const std::string httpVersion)
 {
 	_httpVersion = httpVersion;
+	if (httpVersion != "HTTP/1.1")
+		setValid(false);
+	else
+		setValid(true);
 }
 
 void Request::setHeader(const std::string key, const std::string value)
@@ -210,7 +214,10 @@ void Request::parseRequestLine(const std::string request_line)
 		}
 		setUri(uri);
 		setHttpVersion(http_version);
-		setValid(true);
+		if (http_version != "HTTP/1.1")
+			setValid(false);
+		else
+			setValid(true);
 	}
 	else
 	{

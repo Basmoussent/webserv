@@ -22,6 +22,13 @@ private:
     std::string extractFilenameFromMultipart(const std::string& body, const std::string& boundary) const;
     std::string extractContentFromMultipart(const std::string& body, const std::string& boundary) const;
 
+    // Nouvelles méthodes privées pour le traitement HTTP
+    std::string getMimeType(const std::string& path) const;
+    std::string buildResponse(int statusCode, const std::string& content, const std::string& contentType) const;
+    std::string getCurrentDate() const;
+    std::string generateDirectoryListing(const std::string& path, const std::string& uri) const;
+    std::string getErrorPage(int statusCode) const;
+
 public:
     Handler(const Request& req, const ConfigParser& configParser);
     ~Handler();

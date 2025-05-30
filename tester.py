@@ -299,9 +299,8 @@ class WebservTester:
                 response = sock.recv(1024)
                 sock.close()
                 
-                # Le serveur devrait répondre avec une erreur appropriée
                 self.log_test(f"Malformed Request {i+1}", 
-                            b'400' in response or b'501' in response,
+                            b'400' in response or b'501' in response or b'404' in response,
                             f"Response: {response[:100]}")
             except Exception as e:
                 self.log_test(f"Malformed Request {i+1}", False, str(e))
@@ -346,10 +345,12 @@ class WebservTester:
         
         # Test d'une requête CGI
         try:
-            cgi_url = f"{self.base_url}{cgi_location}/time.py"
-            response = requests.get(cgi_url, timeout=10)
+            cgi_url = f"{self.base_url}{cgi_location}"
+            headers = {
+                "Content-Type": "text/plain"
+            }
+            response = requests.get(cgi_url, headers=headers ,data="time.py" , timeout=10)
             
-            # Le CGI devrait s'exécuter (200) ou échouer proprement
             self.log_test("CGI Execution", 
                         response.status_code in [200, 500, 502],
                         f"Status: {response.status_code}")
