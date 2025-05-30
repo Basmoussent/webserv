@@ -7,7 +7,8 @@ OBJ_DIR = obj
 
 SRCS =	./main.cpp \
 		./$(SRC_DIR)/ConfigParser.cpp \
-		./$(SRC_DIR)/ConfigValid.cpp
+		./$(SRC_DIR)/ConfigValid.cpp \
+		./$(SRC_DIR)/ConfigUtils.cpp
 
 OBJS = $(SRCS:.cpp=.o)
 OBJS := $(OBJS:./%=$(OBJ_DIR)/%)

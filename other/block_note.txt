@@ -76,15 +76,10 @@ server
 	host 127.0.0.1;
 	root /var/www/html;
 	index index.html;
-
-	location /
-	{
-
-	}
 }
 
-
-
-
-dissicier le parsing des validation afin que toute la map
-doit deja entrer pour pouvoir check correctement les valeur contenue dedans
+reste a faire :
+	-check host + : + listen
+	-redirection http
+	-server name a se renseigner
+	-test avec un folder.conf

@@ -25,55 +25,56 @@ struct Server
 class ConfigParser
 {
 	private :
-		int		_blockDepth;
-		bool	_inServer;
-		bool	_inLocation;
-		bool	_bracket;
-
+		int							_blockDepth;
+		bool						_inServer;
+		bool						_inLocation;
+		bool						_bracket;
+	
 		std::map<std::string, int>	_keywords;
+		std::vector<Server>			_servers;
 
-		std::vector<Server>	_servers;
-		Server				_currentServer;
-		Location			_currentLocation;
+		Server						_currentServer;
+		Location					_currentLocation;
 
-		//parsing de .conf
-		bool	openFile(const std::string& filename, std::ifstream& file);
-		bool	parseLine(const std::string& line);
-		bool	handleServerBlock();
-		bool	handleLocationBlock(std::istringstream& iss);
-		bool	handleClosingBrace();
-		bool	assignKeyValue(const std::string& key, std::istringstream& iss);
+		bool		openFile(const std::string& filename, std::ifstream& file);
+		bool		parseLine(const std::string& line);
+		bool		handleServerBlock();
+		bool		handleLocationBlock(std::istringstream& iss);
+		bool		handleClosingBrace();
+		bool		assignKeyValue(const std::string& key, std::istringstream& iss);
+		
+		bool		checkMinimumConfig() const;
+		bool		WhatIsYourName(const std::string& name, const std::string& val) const;
+		// bool		errors(std::string& errorMessage) const;
 		std::string	trim(const std::string& s);
 
-		//check des values
-		bool	WhatIsYourName(const std::string& name, const std::string& val) const;
-		bool	isValueValid(const std::string& key, const std::string& value, const Location& loc, const Server& srv) const;
-		bool	isInteger(const std::string& s) const;
-		bool	isValidPort(const std::string& s) const;
-		bool	isValidIP(const std::string& ip) const;
-		bool	ValidMethods(const std::string& val) const;
-		bool	isValidExtension(const std::string& s) const;
-		bool	isValidRoot(const std::string& path) const ;
-		bool	isName(const std::string& name) const;
-		bool	isValidErrorPage(const std::string& val, const Location& loc, const Server& srv) const;
-		bool	isValidIndex(const std::string& val, const Location& loc, const Server& srv) const;
-		bool	isValidPath(const std::string& path, const Location& loc, const Server& srv) const;
-		std::string getEffectiveRoot(const Location& loc, const Server& srv, const std::string& key) const;
-		
-		//jsp c'est Basem
-		std::string	getInstruct(const std::string& key, const Server server) const;
-		
-		
-		public :
+
+		bool		isValidName(const std::string& name) const;
+		bool		isInteger(const std::string& s) const;
+		bool		isValueValid(const std::string& key, const std::string& value, const Location& loc, const Server& srv) const;
+		bool		isValidPort(const std::string& s) const;
+		bool		isValidIP(const std::string& ip) const;
+		bool		isValidMethods(const std::string& val) const;
+		bool		isValidExtension(const std::string& s) const;
+		bool		isValidRoot(const std::string& path) const ;
+		bool		isValidPath(const std::string& path, const Location& loc, const Server& srv, const std::string& key) const;
+		bool		isValidErrorPage(const std::string& val, const Location& loc, const Server& srv) const;
+		bool		isValidIndex(const std::string& val, const Location& loc, const Server& srv) const;
+		bool		isValidCgi(const std::string& path, const Location& loc, const Server& srv) const;
+		bool		isValidUpload(const std::string& path, const Location& loc, const Server& srv) const;
+		bool		isValidRedirect(const std::string& val, const Location& loc, const Server& srv) const;
+
+	public :
 		ConfigParser();
 		~ConfigParser();
 		
-		bool	parseFile(const std::string& filename);
-		bool	validateConfig() const;
-		void	printServers() const;
-
-		const std::vector<Server>&	getServers() const;
-		const Server& getServerByPort(int port) const;
+		bool			parseFile(const std::string& filename);
+		bool			validateConfig() const;
+		void			printServers() const;
+		
+		const			std::vector<Server>&	getServers() const;
+		std::string		getInstruct(const std::string& key, const Server server) const;
+		const Server&	getServerByPort(int port) const;
 
 };
 
