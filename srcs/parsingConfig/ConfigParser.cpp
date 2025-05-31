@@ -1,4 +1,5 @@
-#include "../includes/ConfigParser.hpp"
+#include "../../includes/ConfigParser.hpp"
+#include "../../includes/ConfigTypes.hpp"
 
 ConfigParser::ConfigParser()
 	: _blockDepth(0), _inServer(false), _inLocation(false)

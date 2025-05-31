@@ -9,18 +9,7 @@
 #include <vector>
 #include <unistd.h>
 #include <cstdlib>
-
-struct Location
-{
-	std::string path;
-	std::map<std::string, std::string> instruct;
-};
-
-struct Server
-{
-	std::vector<Location> locations;
-	std::map<std::string, std::string> instruct;
-};
+#include "ConfigTypes.hpp"
 
 class ConfigParser
 {
@@ -45,10 +34,9 @@ class ConfigParser
 		
 		bool		checkMinimumConfig() const;
 		bool		WhatIsYourName(const std::string& name, const std::string& val) const;
-		// bool		errors(std::string& errorMessage) const;
 		std::string	trim(const std::string& s);
 
-
+		// Validation methods
 		bool		isValidName(const std::string& name) const;
 		bool		isInteger(const std::string& s) const;
 		bool		isValueValid(const std::string& key, const std::string& value, const Location& loc, const Server& srv) const;
@@ -56,7 +44,7 @@ class ConfigParser
 		bool		isValidIP(const std::string& ip) const;
 		bool		isValidMethods(const std::string& val) const;
 		bool		isValidExtension(const std::string& s) const;
-		bool		isValidRoot(const std::string& path) const ;
+		bool		isValidRoot(const std::string& path) const;
 		bool		isValidPath(const std::string& path, const Location& loc, const Server& srv, const std::string& key) const;
 		bool		isValidErrorPage(const std::string& val, const Location& loc, const Server& srv) const;
 		bool		isValidIndex(const std::string& val, const Location& loc, const Server& srv) const;
@@ -75,7 +63,6 @@ class ConfigParser
 		const			std::vector<Server>&	getServers() const;
 		std::string		getInstruct(const std::string& key, const Server server) const;
 		const Server&	getServerByPort(int port) const;
-
 };
 
 #endif

@@ -1,4 +1,5 @@
-#include "../includes/ConfigParser.hpp"
+#include "../../includes/ConfigParser.hpp"
+#include "../../includes/ConfigTypes.hpp"
 
 bool ConfigParser::validateConfig() const
 {
@@ -197,7 +198,7 @@ bool ConfigParser::isValidErrorPage(const std::string& val, const Location& loc,
 	if (!isInteger(code))
 		return false;
 	int nb = atoi(code.c_str());
-	if (nb < 400 && nb >= 600)
+	if (nb < 400 || nb >= 600)
 		return false;
 	return (isValidPath(path, loc, srv, "root"));
 }
