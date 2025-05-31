@@ -33,6 +33,11 @@ Handler::~Handler()
 {
 }
 
+Request& Handler::getRequest()
+{
+	return _request;
+}
+
 void Handler::process()
 {
 	if (_request.isValid())
@@ -370,6 +375,7 @@ std::string Handler::buildResponse(int statusCode, const std::string& content, c
         case 401: statusText = "Unauthorized"; break;
         case 403: statusText = "Forbidden"; break;
         case 404: statusText = "Not Found"; break;
+        case 413: statusText = "Request Entity Too Large"; break;
         case 405: statusText = "Method Not Allowed"; break;
         case 500: statusText = "Internal Server Error"; break;
         default: statusText = "Unknown";

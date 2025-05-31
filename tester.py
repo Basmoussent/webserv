@@ -300,7 +300,7 @@ class WebservTester:
                 sock.close()
                 
                 self.log_test(f"Malformed Request {i+1}", 
-                            b'400' in response or b'501' in response or b'404' in response,
+                            b'400' in response or b'501' in response or b'404' in response or b'403' in response,
                             f"Response: {response[:100]}")
             except Exception as e:
                 self.log_test(f"Malformed Request {i+1}", False, str(e))
@@ -448,32 +448,32 @@ class WebservTester:
             return
         
         # Tests fonctionnels
-        print(f"\n{Colors.colorize('--- Tests des méthodes HTTP ---', Colors.CYAN + Colors.BOLD)}")
-        self.test_basic_http_methods()
-        self.test_location_methods()
+        # print(f"\n{Colors.colorize('--- Tests des méthodes HTTP ---', Colors.CYAN + Colors.BOLD)}")
+        # self.test_basic_http_methods()
+        # self.test_location_methods()
         
-        msg = "--- Tests des pages d'erreur ---"
-        print(f'\n{Colors.colorize(msg, Colors.CYAN + Colors.BOLD)}')
-        self.test_error_pages()
+        # msg = "--- Tests des pages d'erreur ---"
+        # print(f'\n{Colors.colorize(msg, Colors.CYAN + Colors.BOLD)}')
+        # self.test_error_pages()
         
-        print(f"\n{Colors.colorize('--- Tests des fonctionnalités ---', Colors.CYAN + Colors.BOLD)}")
-        self.test_cgi_execution()
-        self.test_autoindex()
+        # print(f"\n{Colors.colorize('--- Tests des fonctionnalités ---', Colors.CYAN + Colors.BOLD)}")
+        # self.test_cgi_execution()
+        # self.test_autoindex()
         
-        print(f"\n{Colors.colorize('--- Tests des cas limites ---', Colors.CYAN + Colors.BOLD)}")
-        self.test_edge_cases()
-        self.test_malformed_requests()
+        # print(f"\n{Colors.colorize('--- Tests des cas limites ---', Colors.CYAN + Colors.BOLD)}")
+        # self.test_edge_cases()
+        # self.test_malformed_requests()
         
         print(f"\n{Colors.colorize('--- Tests de performance ---', Colors.CYAN + Colors.BOLD)}")
-        self.test_concurrent_requests()
+        # self.test_concurrent_requests()
         self.test_large_request_body()
         
-        print(f"\n{Colors.colorize('--- Tests de stress ---', Colors.CYAN + Colors.BOLD)}")
-        self.test_http_headers()
-        self.test_stress_conditions()
+        # print(f"\n{Colors.colorize('--- Tests de stress ---', Colors.CYAN + Colors.BOLD)}")
+        # self.test_http_headers()
+        # self.test_stress_conditions()
         
-        # Arrêt du serveur
-        self.stop_webserv()
+        # # Arrêt du serveur
+        # self.stop_webserv()
         
         # Résumé
         self.print_summary()

@@ -20,6 +20,9 @@ private:
     bool                                _multiform;
     bool                                _chunked;
     bool                                _isValid;
+    bool                                _headersParsed;
+    size_t                              _contentLength;
+    std::string                         _rawRequest;
 
 public:
     Request();
@@ -27,6 +30,8 @@ public:
     Request(const Request& other);
     ~Request();
     Request& operator=(const Request& other);
+
+    Request& getRequest();
 
     // Getters
     const std::string&  getMethod() const;
@@ -38,6 +43,9 @@ public:
     const std::string&  getQueryString() const;
     const std::string&  getHost() const;
     bool                isValid() const;
+    bool                isComplete() const;
+    const std::string&  getRawRequest() const;
+    
 
     // Setters
     void setMethod(const std::string method);
@@ -48,11 +56,14 @@ public:
     void setQueryString(const std::string queryString);
     void setValid(bool isValid);
 
+    void feed(char *buffer, size_t bytes_read);
+
     // Parsers
-	void parseRequest(const std::string raw_request);
-	void parseBody(std::istringstream &request_stream, std::string &body_section);
-	void parseRequestLine(const std::string request_line);
-    void parseHeaders(const std::string headers_sectionvoid);
+    void parseRequest(const std::string raw_request);
+    void parseBody(std::istringstream &request_stream, std::string &body_section);
+    void parseRequestLine(const std::string request_line);
+    void parseHeaders(const std::string headers_section);
+    void appendBody(const std::string& additional_data);
     
     void clear();
     // bool validateRequest() const;

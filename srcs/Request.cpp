@@ -1,16 +1,18 @@
 #include "Request.hpp"
 #include "stdio.h"
+#include <cstdlib>
 #include <sstream>
 #include <iostream>
 #include <vector>
 
-Request::Request() : _isValid(false)
+Request::Request() : _isValid(false), _headersParsed(false), _contentLength(0)
 {
 
 }
 
-Request::Request(const std::string& raw_request) : _isValid(false)
+Request::Request(const std::string& raw_request) : _isValid(false), _headersParsed(false), _contentLength(0)
 {
+	_rawRequest = raw_request;
 	parseRequest(raw_request);
 }
 
@@ -23,6 +25,12 @@ Request::~Request()
 {
 
 }
+
+Request& Request::getRequest()
+{
+	return *this;
+}
+
 Request& Request::operator=(const Request& other)
 {
 	if (this != &other)
@@ -35,6 +43,27 @@ Request& Request::operator=(const Request& other)
 		_isValid = other._isValid;
 	}
 	return *this;
+}
+
+void Request::feed(char *buffer, size_t bytes_read)
+{
+	_rawRequest.append(buffer, bytes_read);
+	if (!_headersParsed)
+	{
+		size_t pos = _rawRequest.find("\r\n\r\n");
+		if (pos != std::string::npos)
+		{
+			std::string headers_section = _rawRequest.substr(0, pos + 2);
+			parseHeaders(headers_section);
+			_headersParsed = true;
+			_rawRequest.erase(0, pos + 4);
+		}
+	}
+	if (_headersParsed && !_isValid)
+	{
+		std::istringstream stream(_rawRequest);
+		parseBody(stream, _body);		
+	}
 }
 
 // Setters
@@ -275,6 +304,62 @@ std::ostream& operator<<(std::ostream& os, const Request& request)
 	return os;
 }
 
+void Request::appendBody(const std::string& additional_data) {
+	_rawRequest += additional_data;
+	
+	// Si les headers n'ont pas encore été parsés, essayer de les parser
+	if (!_headersParsed) {
+		size_t header_end = _rawRequest.find("\r\n\r\n");
+		if (header_end != std::string::npos) {
+			std::string headers_section = _rawRequest.substr(0, header_end);
+			parseHeaders(headers_section);
+			_headersParsed = true;
+			
+			// Mettre à jour la longueur du contenu
+			std::map<std::string, std::string>::const_iterator it = _headers.find("Content-Length");
+			if (it != _headers.end()) {
+				_contentLength = static_cast<size_t>(atoi(it->second.c_str()));
+			}
+		}
+	}
+	
+	// Mettre à jour le body
+	size_t body_start = _rawRequest.find("\r\n\r\n");
+	if (body_start != std::string::npos) {
+		_body = _rawRequest.substr(body_start + 4);
+	}
+}
+
+bool Request::isComplete() const {
+	if (!_headersParsed) {
+		return false;
+	}
+	if (_contentLength == 0) {
+		return true;
+	}
+	return _body.length() >= _contentLength;
+}
+
+const std::string& Request::getRawRequest() const {
+	return _rawRequest;
+}
+
+void Request::clear() {
+	_method.clear();
+	_uri.clear();
+	_httpVersion.clear();
+	_headers.clear();
+	_body.clear();
+	_query_String.clear();
+	_host.clear();
+	_boundary.clear();
+	_multiform = false;
+	_chunked = false;
+	_isValid = false;
+	_headersParsed = false;
+	_contentLength = 0;
+	_rawRequest.clear();
+}
 
 // check request type
 // Verifier le HOST car obligatoire

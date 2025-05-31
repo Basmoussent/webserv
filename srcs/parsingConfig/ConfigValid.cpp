@@ -1,5 +1,5 @@
-#include "../../includes/ConfigParser.hpp"
-#include "../../includes/ConfigTypes.hpp"
+#include "ConfigParser.hpp"
+#include "ConfigTypes.hpp"
 
 bool ConfigParser::validateConfig() const
 {
@@ -94,12 +94,8 @@ bool	ConfigParser::isValidName(const std::string& val) const
 
 bool ConfigParser::isValidExtension(const std::string& s) const
 {
-	const std::string ext[] = {".py", ".sh"};
-	for (size_t i = 0; i < sizeof(ext); ++i)
-	{
-		if (s == ext[i])
-			return true;
-	}
+	if (s == ".py .sh")
+		return true;
 	return false;
 
 }
@@ -168,7 +164,7 @@ bool ConfigParser::isValidRoot(const std::string& path) const
 
 bool	ConfigParser::isValidPath(const std::string& path, const Location& loc, const Server& srv, const std::string& key) const
 {
-	if (path[0] == '.')
+	if (path[0] == '.' || path[0] == '/')
 		return (access(path.c_str(), F_OK) == 0);
 
 	std::map<std::string, std::string>::const_iterator it = loc.instruct.find(key);

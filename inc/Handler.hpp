@@ -43,6 +43,7 @@ public:
     int getStatusCode() const;
     const std::string& getResponse() const;
     std::string getResponse();
+    Request& getRequest();
     bool isValid() const;
 
     // Setters

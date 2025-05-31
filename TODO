@@ -1,6 +1,2 @@
-cgi
-{
-	GET : renvoie la liste des script disponibles
-	POST : execute le script
-
-}
+si ona s une liste d'index essaier de les renvoyer 1 par 1 jusqua que 1 marche bien
+recupere les requete par chunk aussi

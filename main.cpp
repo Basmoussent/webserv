@@ -1,12 +1,13 @@
-#include "./includes/ConfigParser.hpp"
-#include "./includes/SocketHandler.hpp"
-#include "./includes/PollManager.hpp"
+#include "ConfigParser.hpp"
+#include "SocketHandler.hpp"
+#include "PollManager.hpp"
+#include "Handler.hpp"
 
 int main(int ac, char **av)
 {
     if (ac < 2)
     {
-        write(2, "Usage: ./a.out <config_file>\n", 28);
+        write(2, "Usage: ./webserv <config_file>\n", 28);
         return 1;
     }
     
@@ -42,7 +43,7 @@ int main(int ac, char **av)
 	}
     
     // 3. Initialiser poll
-    PollManager pollManager(handler);
+    PollManager pollManager(handler, parser);
     if (!pollManager.init())
     {
         write(2, "Failed to initialize poll\n", 26);

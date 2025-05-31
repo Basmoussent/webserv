@@ -3,16 +3,18 @@ NAME = webserv
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -Iinc
 
-SRCS = main.cc \
+SRCS = main.cpp \
        srcs/Request.cpp \
        srcs/Handler.cpp \
-       srcs/ConfigParser.cpp \
-       srcs/ConfigValidator.cpp \
        srcs/Server.cpp \
-       srcs/TestRequests.cpp
+       srcs/TestRequests.cpp \
+       srcs/parsingConfig/ConfigParser.cpp \
+       srcs/parsingConfig/ConfigUtils.cpp \
+       srcs/parsingConfig/ConfigValid.cpp \
+       srcs/network/SocketHandler.cpp \
+       srcs/network/PollManager.cpp
 
 BUILD_DIR = build
-
 OBJS = $(SRCS:%.cpp=$(BUILD_DIR)/%.o)
 OBJS := $(OBJS:%.cc=$(BUILD_DIR)/%.o)
 
