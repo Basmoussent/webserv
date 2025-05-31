@@ -3,15 +3,17 @@
 #include "PollManager.hpp"
 #include "Handler.hpp"
 
+// Forward declaration of the test function
+void runTest();
+
 int main(int ac, char **av)
 {
     if (ac < 2)
     {
-        write(2, "Usage: ./webserv <config_file>\n", 28);
+        write(2, "Usage: ./webserv <config_file> or ./webserv <config_file> --test\n", 58);
         return 1;
     }
-    
-    // 1. Parser la config
+
     ConfigParser parser;
     if (!parser.parseFile(av[1]))
     {
@@ -24,25 +26,22 @@ int main(int ac, char **av)
         return 1;
     }
 
-    // 2. Initialiser les sockets
     SocketHandler handler;
-	std::vector<Server> servers = parser.getServers();
-	std::vector<ServerConfig> serverConfigs;
+    std::vector<Server> servers = parser.getServers();
+    std::vector<ServerConfig> serverConfigs;
 
-	// Convertir les Server en ServerConfig
-	for (size_t i = 0; i < servers.size(); ++i) {
-		ServerConfig config;
-		config.host = servers[i].instruct["host"];
-		config.port = atoi(servers[i].instruct["listen"].c_str());
-		serverConfigs.push_back(config);
-	}
+    for (size_t i = 0; i < servers.size(); ++i) {
+        ServerConfig config;
+        config.host = servers[i].instruct["host"];
+        config.port = atoi(servers[i].instruct["listen"].c_str());
+        serverConfigs.push_back(config);
+    }
 
-	if (!handler.initServers(serverConfigs)) {
-		write(2, "Failed to initialize servers\n", 29);
-		return 1;
-	}
+    if (!handler.initServers(serverConfigs)) {
+        write(2, "Failed to initialize servers\n", 29);
+        return 1;
+    }
     
-    // 3. Initialiser poll
     PollManager pollManager(handler, parser);
     if (!pollManager.init())
     {
@@ -53,7 +52,6 @@ int main(int ac, char **av)
     write(1, "Server initialized and ready\n", 29);
     write(1, "Starting server...\n", 19);
     
-    // 4. Démarrer le serveur
     pollManager.run();
     
     return 0;

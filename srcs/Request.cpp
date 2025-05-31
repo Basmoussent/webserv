@@ -87,7 +87,10 @@ void Request::setHttpVersion(const std::string httpVersion)
 {
 	_httpVersion = httpVersion;
 	if (httpVersion != "HTTP/1.1")
+	{
 		setValid(false);
+
+	}
 	else
 		setValid(true);
 }
@@ -200,32 +203,75 @@ void Request::parseRequest(const std::string raw_request)
 		headers_section+=header_line; 
 		headers_section += "\n";
 	}
-	parseBody(request_stream, body_section);
 	parseHeaders(headers_section);
-	if (getHeader("Host").empty())
+	parseBody(request_stream, body_section);
+	if (!_chunked && getHeader("Host").empty())
+	{
 		setValid(false);	
+	}
 }
 
 void Request::parseBody(std::istringstream &request_stream, std::string &body_section)
 {
-    std::string line;
-    bool isFirstLine = true;
-    
-    while (std::getline(request_stream, line))
-    {
-        if (isFirstLine && line.empty())
-        {
-            isFirstLine = false;
-            continue;
+    if (_chunked) {
+        std::string line;
+        while (std::getline(request_stream, line)) {
+            std::cout << "Parsing chunked body line: [" << line << "]" << std::endl;
+            if (!line.empty() && line[line.length() - 1] == '\r') {
+                line = line.substr(0, line.length() - 1);
+            }
+            if (line.empty()) {
+                continue;
+            }
+            size_t chunk_size;
+            try {
+                chunk_size = std::strtoul(line.c_str(), NULL, 16);
+                std::cout << "Chunk size: " << chunk_size << std::endl;
+            } catch (const std::exception&) {
+                std::cout << "Failed to parse chunk size from: " << line << std::endl;
+                continue;
+            }
+            if (chunk_size == 0) {
+                std::cout << "Found end chunk" << std::endl;
+                break;
+            }
+            std::string chunk;
+            chunk.resize(chunk_size);
+            request_stream.read(&chunk[0], chunk_size);
+            char crlf[2];
+            request_stream.read(crlf, 2);
+            std::cout << "Read chunk content: [" << chunk << "]" << std::endl;
+            body_section += chunk;
         }
-        if (!line.empty())
-        {
-            if (!body_section.empty())
-                body_section += "\n";
-            body_section += line;
+    } else {
+        std::string line;
+        bool isFirstLine = true;
+        
+        while (std::getline(request_stream, line)) {
+            if (isFirstLine && line.empty()) {
+                isFirstLine = false;
+                continue;
+            }
+            if (!line.empty()) {
+                if (!body_section.empty())
+                    body_section += "\n";
+                body_section += line;
+            }
         }
     }
     setBody(body_section);
+	std::cout << "Parsed body: [" << this->_body << "]" << std::endl;
+
+	if (body_section.empty()) {
+		_contentLength = 0;
+	} else {
+		std::map<std::string, std::string>::const_iterator it = _headers.find("Content-Length");
+		if (it != _headers.end()) {
+			_contentLength = static_cast<size_t>(atoi(it->second.c_str()));
+		} else {
+			_contentLength = body_section.length();
+		}
+	}
 }
 
 void Request::parseRequestLine(const std::string request_line)
@@ -247,7 +293,10 @@ void Request::parseRequestLine(const std::string request_line)
 		setUri(uri);
 		setHttpVersion(http_version);
 		if (http_version != "HTTP/1.1")
+		{
 			setValid(false);
+			std::cerr << "Invalid HTTP version: " << http_version << std::endl;
+		}
 		else
 			setValid(true);
 	}
@@ -269,6 +318,13 @@ void Request::parseHeaders(std::string header)
         {
             std::string key = line.substr(0, pos);
             std::string value = line.substr(pos + 1);
+            
+            // Trim whitespace from key and value
+            key.erase(0, key.find_first_not_of(" \t\r\n"));
+            key.erase(key.find_last_not_of(" \t\r\n") + 1);
+            value.erase(0, value.find_first_not_of(" \t\r\n"));
+            value.erase(value.find_last_not_of(" \t\r\n") + 1);
+
             if (key == "Content-Type" && value.find("multipart/form-data") != std::string::npos)
             {
                 std::size_t boundary_pos = value.find("boundary=");
@@ -278,8 +334,10 @@ void Request::parseHeaders(std::string header)
                     _multiform = true;
                 }
             }
-            else if (key == "Transfer-Encoding" && value.find("chunked") != std::string::npos)
+            else if (key == "Transfer-Encoding" && value.find("chunked") != std::string::npos) {
                 _chunked = true;
+                std::cout << "Found chunked transfer encoding" << std::endl;
+            }
             setHeader(key, value);
         }
     }

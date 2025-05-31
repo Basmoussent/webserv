@@ -155,14 +155,18 @@ void PollManager::run() {
                             }
 
                             // Traiter la requête complète
+                            
+
                             handler.process();
+                            if (handler.getStatusCode() != -1)
+                            {
+                                // Envoyer la réponse
+                                std::string response = handler.getResponse();
+                                write(pfd.fd, response.c_str(), response.length());
 
-                            // Envoyer la réponse
-                            std::string response = handler.getResponse();
-                            write(pfd.fd, response.c_str(), response.length());
-
-                            // Marquer pour suppression
-                            to_remove.push_back(pfd.fd);
+                                // Marquer pour suppression
+                                to_remove.push_back(pfd.fd);
+                            }
                         }
                     } else {
                         // Continuer la lecture de la requête existante

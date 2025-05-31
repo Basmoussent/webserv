@@ -23,7 +23,7 @@ std::string Handler::sizeToString(size_t value) {
     return ss.str();
 }
 
-Handler::Handler(const Request& req, const ConfigParser &ConfgiParser) : _request(req), _isValid(false), _configParser(ConfgiParser)
+Handler::Handler(const Request& req, const ConfigParser &ConfgiParser) : _request(req),  _statusCode(-1), _isValid(false), _configParser(ConfgiParser)
 {
 	process();
     std::cout << _response << std::endl;
@@ -127,7 +127,7 @@ void Handler::process()
 	else
 	{
 		setStatusCode(400);
-		_response = buildResponse(400, "Bad Request", "text/plain");
+		_response = buildResponse(400, "Bad Request 1", "text/plain");
 	}
 }
 

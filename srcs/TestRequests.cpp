@@ -42,10 +42,25 @@ void runTests(ConfigParser& parser) {
     //               "Host: 127.0.0.1:8002\r\n"
     //               "\r\n\r\n";
     
-    requests[0] = "GET /../../test HTTP/1.1\r\n"
+    // requests[5] = "GET /../../test HTTP/1.1\r\n"
+    //               "Host: 127.0.0.1:8002\r\n"
+    //               "\r\n"
+    //               "\r\n";
+
+    requests[0] = "POST /test HTTP/1.1\r\n"
                   "Host: 127.0.0.1:8002\r\n"
+                  "Content-Type: application/json\r\n"
+                  "Transfer-Encoding: chunked\r\n"
+                  "Connection: close\r\n"
                   "\r\n"
+                  "1A\r\n"
+                  "{\r\n"
+                  "  \"username\": \"alice\",\r\n"
+                  "  \"password\": \"qwe\"\r\n"
+                  "}\r\n"
+                  "0\r\n"
                   "\r\n";
+
 
     std::cout << "\n=== Testing Requests ===" << std::endl;
     for (int i = 0; i < NUM_REQUESTS; ++i) {
