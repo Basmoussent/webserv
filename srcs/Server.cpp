@@ -189,14 +189,9 @@ void runServer(ConfigParser& parser) {
                 }
                 std::cout << "Received " << bytes_received << " bytes" << std::endl;
 
-                // Create Request object and parse the received data
                 std::string raw_request(buffer, bytes_received);
                 Request request(raw_request);
-                
-                // Create Handler to process the request
                 Handler handler(request, parser);
-
-                // Send the response back to the client
                 std::string response = handler.getResponse();
                 ssize_t sent = send(client_socket, response.c_str(), response.length(), 0);
                 if (sent < 0) {

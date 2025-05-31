@@ -343,13 +343,10 @@ class WebservTester:
             self.log_test("CGI Execution", True, "No CGI configured - skipped")
             return
         
-        # Test d'une requête CGI
         try:
-            cgi_url = f"{self.base_url}{cgi_location}"
-            headers = {
-                "Content-Type": "text/plain"
-            }
-            response = requests.get(cgi_url, headers=headers ,data="time.py" , timeout=10)
+            cgi_url = f"{self.base_url}{cgi_location}/hello.py"
+            print(f"Testing CGI execution at: {cgi_url}")
+            response = requests.get(cgi_url , timeout=10)
             
             self.log_test("CGI Execution", 
                         response.status_code in [200, 500, 502],

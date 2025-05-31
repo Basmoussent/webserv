@@ -1,5 +1,8 @@
 #include "Request.hpp"
 #include "stdio.h"
+#include <sstream>
+#include <iostream>
+#include <vector>
 
 Request::Request() : _isValid(false)
 {

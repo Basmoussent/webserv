@@ -36,9 +36,9 @@ public:
     void process();
     void handleGet(Server serv, int j);
     void handlePost(std::string& path);
-    void handleDelete(std::string &path);
+    void handleDelete();
     void handleCGI();
-
+    std::string normalizePath(const std::string& path);
     // Getters
     int getStatusCode() const;
     const std::string& getResponse() const;
@@ -49,6 +49,8 @@ public:
     void setStatusCode(int statusCode);
     void setResponse(const std::string& response);
     void setValid(bool isValid);
+
+    void clear();
 
 };
 std::ostream& operator<<(std::ostream& os, const Handler& handler);

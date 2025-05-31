@@ -58,6 +58,20 @@ void Handler::process()
             _response = buildResponse(404, "Not Found", "text/plain");
             return;
         }
+
+        if (_request.getMethod() == "POST") {
+            std::string contentLength = _request.getHeader("Content-Length");
+            if (!contentLength.empty()) {
+                size_t bodySize = std::atoi(contentLength.c_str());
+                size_t maxSize = std::atoi(server.instruct["client_max_body_size"].c_str());
+                if (bodySize > maxSize) {
+                    setStatusCode(413);
+                    _response = buildResponse(413, "Request Entity Too Large", "text/plain");
+                    return;
+                }
+            }
+        }
+
         bool locationFound = false;
         size_t j = 0;
         for (j = 0; j < server.locations.size(); j++)
@@ -95,14 +109,14 @@ void Handler::process()
             return;
         }
 
-        if (_request.getUri() == "/cgi-bin")
+        if (_request.getUri().find("/cgi-bin/") == 0 || (_request.getUri().find("/cgi-bin") == 0 && _request.getUri().length() == 8))
             handleCGI();
         else if (_request.getMethod() == "GET")
 			handleGet(server, j);
 		else if (_request.getMethod() == "POST")
 			handlePost(server.locations[j].path);
 		else if (_request.getMethod() == "DELETE")
-			handleDelete(server.locations[j].path);
+			handleDelete();
 		setValid(true);
 	}
 	else
@@ -135,13 +149,14 @@ void Handler::handleCGI()
 
     if (!found) {
         setStatusCode(404);
-        _response = "HTTP/1.1 404 Not Found 4\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nNot Found";
+        _response = buildResponse(404, "Not Found", "text/plain");
         return;
     }
 
     std::string cgiPath = location.instruct["cgi_path"];
     std::string cgiExt = location.instruct["cgi_ext"];
     std::string index = location.instruct["index"];
+    std::string root = location.instruct["root"];
 
     std::vector<std::string> extensions;
     std::istringstream extStream(cgiExt);
@@ -161,20 +176,21 @@ void Handler::handleCGI()
         }
     }
 
-    std::string filename = "./cgi-bin/" + _request.getUri().substr(_request.getUri().find_last_of("/") + 1);
+    std::string basePath = root.empty() ? "./cgi-bin" : root;
+    std::string filename = basePath + "/" + _request.getUri().substr(_request.getUri().find_last_of("/") + 1);
     std::cout << "Filename: " << filename << std::endl;
     struct stat fileStat;
 
     if (stat(filename.c_str(), &fileStat) != 0 && !index.empty()) {
-        filename = "./cgi-bin/" + index;
+        filename = basePath + "/" + index;
         if (stat(filename.c_str(), &fileStat) != 0) {
             setStatusCode(404);
-            _response = "HTTP/1.1 404 Not Found 5\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nNot Found";
+            _response = buildResponse(404, "Not Found", "text/plain");
             return;
         }
     } else if (stat(filename.c_str(), &fileStat) != 0) {
         setStatusCode(404);
-        _response = "HTTP/1.1 404 Not Found 6\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nNot Found";
+        _response = buildResponse(404, "Not Found", "text/plain");
         return;
     }
 
@@ -189,104 +205,131 @@ void Handler::handleCGI()
 
     if (!validExtension) {
         setStatusCode(403);
-        _response = "HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\nContent-Length: 10\r\n\r\nForbidden";
+        _response = buildResponse(403, "Forbidden", "text/plain");
         return;
     }
 
-    std::map<std::string, std::string> env;
-    env["REQUEST_METHOD"] = _request.getMethod();
-    env["QUERY_STRING"] = _request.getQueryString();
-    env["CONTENT_LENGTH"] = _request.getHeader("Content-Length");
-    env["CONTENT_TYPE"] = _request.getHeader("Content-Type");
-    env["SCRIPT_NAME"] = _request.getUri();
-    env["SERVER_PROTOCOL"] = "HTTP/1.1";
-    env["SERVER_SOFTWARE"] = "webserv/1.0";
-    env["REMOTE_ADDR"] = server.instruct["host"] + ":" + server.instruct["listen"];
-    env["REMOTE_PORT"] = server.instruct["listen"];
-
-    std::string command;
-    if (extension == ".py" && interpreters.size() > 0) {
-        command = interpreters[0] + " " + filename;
-    } else if (extension == ".sh" && interpreters.size() > 1) {
-        command = interpreters[1] + " " + filename;
-    } else {
-        setStatusCode(500);
-        _response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 21\r\n\r\nInternal Server Error";
-        return;
-    }
-
-    int pipefd[2];
-    if (pipe(pipefd) == -1) {
-        setStatusCode(500);
-        _response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 21\r\n\r\nInternal Server Error";
-        return;
-    }
-
-    pid_t pid = fork();
-    if (pid == -1) {
-        close(pipefd[0]);
-        close(pipefd[1]);
-        setStatusCode(500);
-        _response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 21\r\n\r\nInternal Server Error";
-        return;
-    }
-
-    if (pid == 0) {
-        std::vector<std::string> envStrings;
-        for (std::map<std::string, std::string>::iterator it = env.begin(); it != env.end(); ++it) {
-            envStrings.push_back(it->first + "=" + it->second);
+    if (_request.getMethod() == "POST") {
+        std::ifstream file(filename.c_str(), std::ios::binary);
+        if (!file) {
+            setStatusCode(500);
+            _response = buildResponse(500, "Internal Server Error", "text/plain");
+            return;
         }
-        
-        std::vector<char*> envArray;
-        for (std::vector<std::string>::iterator it = envStrings.begin(); it != envStrings.end(); ++it) {
-            envArray.push_back(const_cast<char*>(it->c_str()));
-        }
-        envArray.push_back(NULL);
-
-        std::vector<std::string> args;
-        args.push_back("/bin/sh");
-        args.push_back("-c");
-        args.push_back(command);
-
-        std::vector<char*> argArray;
-        for (std::vector<std::string>::iterator it = args.begin(); it != args.end(); ++it) {
-            argArray.push_back(const_cast<char*>(it->c_str()));
-        }
-        argArray.push_back(NULL);
-
-        dup2(pipefd[1], STDOUT_FILENO);
-        close(pipefd[0]);
-        close(pipefd[1]);
-
-        execve("/bin/sh", &argArray[0], &envArray[0]);
-        exit(1);
-    }
-
-    close(pipefd[1]);
-    
-    std::string output;
-    char readBuffer[4096];
-    ssize_t bytes_read;
-    while ((bytes_read = read(pipefd[0], readBuffer, sizeof(readBuffer) - 1)) > 0) {
-        readBuffer[bytes_read] = '\0';
-        output += readBuffer;
-    }
-    close(pipefd[0]);
-
-    int status;
-    waitpid(pid, &status, 0);
-
-    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+        std::ostringstream ss;
+        ss << file.rdbuf();
+        std::string content = ss.str();
         setStatusCode(200);
-        std::ostringstream len;
-        len << output.size();
-        _response = "HTTP/1.1 200 OK\r\n"
-                   "Content-Type: text/html\r\n"
-                   "Content-Length: " + len.str() + "\r\n"
-                   "\r\n" + output;
-    } else {
-        setStatusCode(500);
-        _response = buildResponse(500, "Internal Server Error", "text/plain");
+        _response = buildResponse(200, content, "text/plain");
+        return;
+    }
+    else if (_request.getMethod() == "DELETE") {
+        if (remove(filename.c_str()) == 0) {
+            setStatusCode(200);
+            _response = buildResponse(200, "Script deleted successfully", "text/plain");
+        } else {
+            setStatusCode(500);
+            _response = buildResponse(500, "Failed to delete script", "text/plain");
+        }
+        return;
+    }
+    else if (_request.getMethod() == "GET") {
+        std::map<std::string, std::string> env;
+        env["REQUEST_METHOD"] = _request.getMethod();
+        env["QUERY_STRING"] = _request.getQueryString();
+        env["CONTENT_LENGTH"] = _request.getHeader("Content-Length");
+        env["CONTENT_TYPE"] = _request.getHeader("Content-Type");
+        env["SCRIPT_NAME"] = _request.getUri();
+        env["SERVER_PROTOCOL"] = "HTTP/1.1";
+        env["SERVER_SOFTWARE"] = "webserv/1.0";
+        env["REMOTE_ADDR"] = server.instruct["host"] + ":" + server.instruct["listen"];
+        env["REMOTE_PORT"] = server.instruct["listen"];
+
+        std::string command;
+        if (extension == ".py" && interpreters.size() > 0) {
+            command = interpreters[0] + " " + filename;
+        } else if (extension == ".sh" && interpreters.size() > 1) {
+            command = interpreters[1] + " " + filename;
+        } else {
+            setStatusCode(500);
+            _response = buildResponse(500, "Internal Server Error", "text/plain");
+            return;
+        }
+
+        int pipefd[2];
+        if (pipe(pipefd) == -1) {
+            setStatusCode(500);
+            _response = buildResponse(500, "Internal Server Error", "text/plain");
+            return;
+        }
+
+        pid_t pid = fork();
+        if (pid == -1) {
+            close(pipefd[0]);
+            close(pipefd[1]);
+            setStatusCode(500);
+            _response = buildResponse(500, "Internal Server Error", "text/plain");
+            return;
+        }
+
+        if (pid == 0) {
+            std::vector<std::string> envStrings;
+            for (std::map<std::string, std::string>::iterator it = env.begin(); it != env.end(); ++it) {
+                envStrings.push_back(it->first + "=" + it->second);
+            }
+            
+            std::vector<char*> envArray;
+            for (std::vector<std::string>::iterator it = envStrings.begin(); it != envStrings.end(); ++it) {
+                envArray.push_back(const_cast<char*>(it->c_str()));
+            }
+            envArray.push_back(NULL);
+
+            std::vector<std::string> args;
+            args.push_back("/bin/sh");
+            args.push_back("-c");
+            args.push_back(command);
+
+            std::vector<char*> argArray;
+            for (std::vector<std::string>::iterator it = args.begin(); it != args.end(); ++it) {
+                argArray.push_back(const_cast<char*>(it->c_str()));
+            }
+            argArray.push_back(NULL);
+
+            dup2(pipefd[1], STDOUT_FILENO);
+            close(pipefd[0]);
+            close(pipefd[1]);
+
+            execve("/bin/sh", &argArray[0], &envArray[0]);
+            exit(1);
+        }
+
+        close(pipefd[1]);
+        
+        std::string output;
+        char readBuffer[4096];
+        ssize_t bytes_read;
+        while ((bytes_read = read(pipefd[0], readBuffer, sizeof(readBuffer) - 1)) > 0) {
+            readBuffer[bytes_read] = '\0';
+            output += readBuffer;
+        }
+        close(pipefd[0]);
+
+        int status;
+        waitpid(pid, &status, 0);
+
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+            setStatusCode(200);
+            std::ostringstream len;
+            len << output.size();
+            _response = buildResponse(200, output, "text/plain");
+        } else {
+            setStatusCode(500);
+            _response = buildResponse(500, "Internal Server Error", "text/plain");
+        }
+    }
+    else {
+        setStatusCode(405);
+        _response = buildResponse(405, "Method Not Allowed", "text/plain");
     }
 }
 
@@ -355,12 +398,65 @@ std::string Handler::getCurrentDate() const {
     return std::string(buffer);
 }
 
+std::string Handler::normalizePath(const std::string& path) {
+    if (path.find("..") != std::string::npos || 
+        path.find("//") != std::string::npos ||
+        path.find("\\") != std::string::npos ||
+        path.find("%2e") != std::string::npos ||
+        path.find("%2f") != std::string::npos ||
+        path.find("%5c") != std::string::npos) {
+        setStatusCode(403);
+        _response = buildResponse(403, "Forbidden - Path traversal attempt detected", "text/plain");
+        return "";
+    }
+
+    std::vector<std::string> parts;
+    std::string current;
+    std::istringstream iss(path);
+    
+    while (std::getline(iss, current, '/')) {
+        if (current.empty() || current == ".") continue;
+        if (current == "..") {
+            if (!parts.empty()) parts.pop_back();
+        } else {
+            parts.push_back(current);
+        }
+    }
+    
+    std::string normalized = "/";
+    for (size_t i = 0; i < parts.size(); ++i) {
+        normalized += parts[i];
+        if (i < parts.size() - 1) normalized += "/";
+    }
+    return normalized;
+}
+
 void Handler::handleGet(Server serv, int j)
 {
     struct stat buffer;
     std::string root;
     std::string index;
     std::string uri = _request.getUri();
+    
+    std::cout << "Handling GET request for URI: " << uri << std::endl;
+    if (uri.find("..") != std::string::npos) {
+        std::string normalized = normalizePath(uri);
+        std::cout << "Normalized URI: " << normalized << std::endl;
+        if (normalized.empty())
+            return;
+        if (normalized != uri) {
+            setStatusCode(301);
+            std::string redirectUrl = normalized;
+            if (normalized[normalized.length() - 1] != '/') {
+                redirectUrl += "/";
+            }
+            std::string response = "HTTP/1.1 301 Moved Permanently\r\n";
+            response += "Location: " + redirectUrl + "\r\n";
+            response += "\r\n";
+            _response = response;
+            return;
+        }
+    }
     
     if (!serv.instruct["root"].empty())
         root = serv.instruct["root"];
@@ -389,27 +485,33 @@ void Handler::handleGet(Server serv, int j)
         return;
     }
     if (S_ISDIR(buffer.st_mode)) {
-        if (uri[uri.length() - 1] != '/') {
-            setStatusCode(301);
-            std::string location = "Location: " + uri + "/\r\n";
-            _response = buildResponse(301, "", "text/plain");
-            _response.insert(_response.find("\r\n\r\n"), location);
-            return;
-        }
-        std::string indexPath = fullPath + index;
-        if (stat(indexPath.c_str(), &buffer) != 0) {
-            if (serv.locations[j].instruct["autoindex"] == "on") {
+        if (S_ISDIR(buffer.st_mode)) {
+            if (uri[uri.length() - 1] != '/') {
+                setStatusCode(301);
+                std::string redirectUrl = uri + "/";
+                std::string response = "HTTP/1.1 301 Moved Permanently\r\n";
+                response += "Location: " + redirectUrl + "\r\n";
+                response += "\r\n";
+                _response = response;
+                return;
+            }
+            std::string indexPath = fullPath + index;
+            if (stat(indexPath.c_str(), &buffer) == 0) {
+                fullPath = indexPath;
+            }
+            else if (serv.locations[j].instruct["autoindex"] == "on") {
                 std::string autoindexHtml = generateDirectoryListing(fullPath, uri);
                 setStatusCode(200);
                 _response = buildResponse(200, autoindexHtml, "text/html");
-            } else {
+                return;
+            }
+            else {
                 setStatusCode(403);
                 std::string errorPage = getErrorPage(403);
                 _response = buildResponse(403, errorPage, "text/html");
+                return;
             }
-            return;
         }
-        fullPath = indexPath;
     }
     std::ifstream file(fullPath.c_str(), std::ios::binary);
     if (!file) {
@@ -693,28 +795,29 @@ void Handler::handlePost(std::string& path)
     }
 }
 
-void Handler::handleDelete(std::string &path)
+void Handler::handleDelete()
 {
-    const std::string filename = _request.getBody();
-    const std::string fullPath = "." + path + "/" + filename;
-
-    if (filename.empty())
+    std::string uri = _request.getUri();
+    if (uri.empty() || uri == "/")
     {
         setStatusCode(400);
-        _response = buildResponse(400, "Missing filename in body", "text/plain");
+        _response = buildResponse(400, "Missing filename in URI", "text/plain");
         return;
     }
 
-    if (remove(fullPath.c_str()) == 0)
+    if (uri[0] == '/')
+        uri = uri.substr(1);
+
+    if (remove(uri.c_str()) == 0)
     {
         setStatusCode(200);
-        std::string message = "File deleted successfully: " + filename;
+        std::string message = "File deleted successfully: " + uri;
         _response = buildResponse(200, message, "text/plain");
     }
     else
     {
         setStatusCode(404);
-        std::string message = "File not found: " + fullPath;
+        std::string message = "File not found: " + uri;
         _response = buildResponse(404, message, "text/plain");
     }
 }
@@ -753,6 +856,14 @@ void Handler::setResponse(const std::string& response)
 void Handler::setValid(bool isValid)
 {
 	_isValid = isValid;
+}
+
+void Handler::clear()
+{
+    _request = Request();
+    _response = "";
+    _statusCode = 0;
+    _isValid = false;
 }
 
 std::ostream& operator<<(std::ostream& os, const Handler& handler)
