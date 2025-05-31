@@ -79,7 +79,4 @@ server
 }
 
 reste a faire :
-	-check host + : + listen
-	-redirection http
-	-server name a se renseigner
 	-test avec un folder.conf

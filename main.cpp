@@ -7,7 +7,7 @@ int main(int ac, char **av)
 		std::cerr << "Usage: ./a.out <config_file>" << std::endl;
 		return 1;
 	}
-	
+
 	ConfigParser parser;
 	if (!parser.parseFile(av[1]))
 	{
@@ -20,5 +20,6 @@ int main(int ac, char **av)
 		return 1;
 	}
 	parser.printServers();
+	std::cout << "Configuration file parsed and validated successfully." << std::endl;
 	return 0;
 }
