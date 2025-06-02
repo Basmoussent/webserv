@@ -16,7 +16,6 @@ static void setNonBlocking(int fd) {
 
 PollManager::PollManager(SocketHandler& socketHandler, ConfigParser& configParser)
     : _socketHandler(socketHandler), _configParser(configParser) {
-    // Initialisation des pollfds avec les sockets du SocketHandler
     const std::vector<int>& sockets = _socketHandler.getServerSockets();
     for (std::vector<int>::const_iterator it = sockets.begin(); it != sockets.end(); ++it) {
         pollfd pfd;
@@ -59,11 +58,19 @@ bool PollManager::init() {
     }
     return true;
 }
+int code = 0;
+
+void stop_handler(int signum) {
+    if (signum == SIGINT) {
+        write(1, "[DEBUG] Arrêt du serveur demandé\n", 35);
+        code = 1;
+    }
+}
 
 void PollManager::run() {
     std::map<int, std::string> clientBuffers;
-    
-    while (true) {
+    signal(SIGINT, stop_handler);
+    while (code == 0) {
         int ready = poll(&_pollfds[0], _pollfds.size(), -1);
         if (ready < 0) {
             write(2, "[ERROR] poll() failed\n", 22);
@@ -143,28 +150,23 @@ void PollManager::run() {
                         write(1, "[DEBUG] Requête HTTP complète détectée\n", 40);
                         
                         try {
-                            // Créer un objet Request avec les données reçues
                             Request request(fullBuffer);
                             
                             if (request.isValid()) {
                                 write(1, "[DEBUG] Requête valide, création du Handler\n", 45);
                                 
-                                // Créer un Handler pour traiter la requête
                                 Handler* handler = new Handler(request, _configParser);
                                 _handlers[pfd.fd] = handler;
                                 
-                                // Obtenir la réponse du Handler
                                 std::string response = handler->getResponse();
                                 
-                                // Envoyer la réponse au client
                                 int sent = send(pfd.fd, response.c_str(), response.length(), 0);
                                 if (sent < 0) {
                                     write(2, "[ERROR] Envoi de la réponse échoué\n", 36);
                                     to_remove.push_back(pfd.fd);
                                 } else {
-                                    write(1, "[DEBUG] Réponse envoyée avec succès\n", 37);
+                                    write(1, "[DEBUG] Réponse envoyée avec succès\n", 39);
                                     
-                                    // Vérifier si la connexion doit être maintenue
                                     std::string connection = request.getHeader("Connection");
                                     if (connection == "close") {
                                         write(1, "[DEBUG] Client demande la fermeture de la connexion\n", 52);
@@ -177,7 +179,6 @@ void PollManager::run() {
                                 _handlers.erase(pfd.fd);
                             } else {
                                 write(1, "[DEBUG] Requête invalide\n", 26);
-                                // Envoyer une erreur 400
                                 std::string errorResponse = "HTTP/1.1 400 Bad Request\r\nContent-Length: 11\r\nConnection: close\r\n\r\nBad Request";
                                 send(pfd.fd, errorResponse.c_str(), errorResponse.length(), 0);
                                 to_remove.push_back(pfd.fd);
@@ -190,7 +191,6 @@ void PollManager::run() {
                             to_remove.push_back(pfd.fd);
                         }
                         
-                        // Nettoyer le buffer seulement si on ferme la connexion
                         if (std::find(to_remove.begin(), to_remove.end(), pfd.fd) != to_remove.end()) {
                             clientBuffers.erase(pfd.fd);
                         }
@@ -206,6 +206,20 @@ void PollManager::run() {
             removeFromPoll(to_remove[i]);
         }
     }
+    
+    write(1, "[DEBUG] Nettoyage des ressources...\n", 36);
+    
+    for (size_t i = 0; i < _pollfds.size(); ++i) {
+        if (_pollfds[i].fd > 2) {
+            close(_pollfds[i].fd);
+        }
+    }
+    std::vector<int> server_socks = _socketHandler.getServerSockets();
+    for (size_t i = 0; i < server_socks.size(); i++) {
+        close(server_socks[i]);
+    }
+    cleanupHandlers();
+    write(1, "[DEBUG] Arrêt du serveur terminé\n", 34);
 }
 
 void PollManager::addToPoll(int fd, short events) {

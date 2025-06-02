@@ -7,6 +7,7 @@
 #include "ConfigParser.hpp"
 #include "Request.hpp"
 #include "Handler.hpp"
+#include <csignal>
 
 class PollManager {
 public:

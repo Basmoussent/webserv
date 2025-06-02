@@ -1,7 +1,7 @@
 NAME = webserv
 
 CXX = c++
-CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -Iinc
+CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -Iinc -g3
 
 SRCS = main.cpp \
        srcs/Request.cpp \
