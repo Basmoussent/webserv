@@ -23,7 +23,7 @@ std::string Handler::sizeToString(size_t value) {
     return ss.str();
 }
 
-Handler::Handler(const Request& req, const ConfigParser &ConfgiParser) : _request(req),  _statusCode(-1), _isValid(false), _configParser(ConfgiParser)
+Handler::Handler(Request& req, ConfigParser& configParser) : _request(req), _configParser(configParser), _statusCode(-1), _isValid(false)
 {
 	process();
     std::cout << _response << std::endl;
@@ -492,34 +492,33 @@ void Handler::handleGet(Server serv, int j)
         return;
     }
     if (S_ISDIR(buffer.st_mode)) {
-        if (S_ISDIR(buffer.st_mode)) {
-            if (uri[uri.length() - 1] != '/') {
-                setStatusCode(301);
-                std::string redirectUrl = uri + "/";
-                std::string response = "HTTP/1.1 301 Moved Permanently\r\n";
-                response += "Location: " + redirectUrl + "\r\n";
-                response += "\r\n";
-                _response = response;
-                return;
-            }
-            std::string indexPath = fullPath + index;
-            if (stat(indexPath.c_str(), &buffer) == 0) {
-                fullPath = indexPath;
-            }
-            else if (serv.locations[j].instruct["autoindex"] == "on") {
-                std::string autoindexHtml = generateDirectoryListing(fullPath, uri);
-                setStatusCode(200);
-                _response = buildResponse(200, autoindexHtml, "text/html");
-                return;
-            }
-            else {
-                setStatusCode(403);
-                std::string errorPage = getErrorPage(403);
-                _response = buildResponse(403, errorPage, "text/html");
-                return;
-            }
+        if (uri[uri.length() - 1] != '/') {
+            setStatusCode(301);
+            std::string redirectUrl = uri + "/";
+            std::string response = "HTTP/1.1 301 Moved Permanently\r\n";
+            response += "Location: " + redirectUrl + "\r\n";
+            response += "\r\n";
+            _response = response;
+            return;
+        }
+        std::string indexPath = fullPath + index;
+        if (stat(indexPath.c_str(), &buffer) == 0) {
+            fullPath = indexPath;
+        }
+        else if (serv.locations[j].instruct["autoindex"] == "on") {
+            std::string autoindexHtml = generateDirectoryListing(fullPath, uri);
+            setStatusCode(200);
+            _response = buildResponse(200, autoindexHtml, "text/html");
+            return;
+        }
+        else {
+            setStatusCode(403);
+            std::string errorPage = getErrorPage(403);
+            _response = buildResponse(403, errorPage, "text/html");
+            return;
         }
     }
+    
     std::ifstream file(fullPath.c_str(), std::ios::binary);
     if (!file) {
         setStatusCode(500);

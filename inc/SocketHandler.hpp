@@ -8,7 +8,6 @@
 struct ServerConfig {
     std::string host;
     int         port;
-    // Add other server configuration fields as needed...
 };
 
 class SocketHandler {

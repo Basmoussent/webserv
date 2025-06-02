@@ -7,22 +7,20 @@
 
 class Handler {
 private:
-    Request      _request;
-    std::string  _response;
+    Request& _request;
+    ConfigParser& _configParser;
+    std::string _response;
     int          _statusCode;
     bool         _isValid;
-    ConfigParser _configParser;
 
     static std::string intToString(int value);
     static std::string sizeToString(size_t value);
 
-    // Méthodes privées pour l'upload
     std::string getUploadDirectory(const Server& server, const Location& location) const;
     bool handleFileUpload(const std::string& uploadDir, const std::string& filename, const std::string& content);
     std::string extractFilenameFromMultipart(const std::string& body, const std::string& boundary) const;
     std::string extractContentFromMultipart(const std::string& body, const std::string& boundary) const;
 
-    // Nouvelles méthodes privées pour le traitement HTTP
     std::string getMimeType(const std::string& path) const;
     std::string buildResponse(int statusCode, const std::string& content, const std::string& contentType) const;
     std::string getCurrentDate() const;
@@ -30,7 +28,7 @@ private:
     std::string getErrorPage(int statusCode) const;
 
 public:
-    Handler(const Request& req, const ConfigParser& configParser);
+    Handler(Request& request, ConfigParser& configParser);
     ~Handler();
 
     void process();

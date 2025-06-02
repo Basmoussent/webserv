@@ -2,9 +2,7 @@
 #include "SocketHandler.hpp"
 #include "PollManager.hpp"
 #include "Handler.hpp"
-
-// Forward declaration of the test function
-void runTest();
+#include "Server.hpp"
 
 int main(int ac, char **av)
 {
@@ -26,33 +24,7 @@ int main(int ac, char **av)
         return 1;
     }
 
-    SocketHandler handler;
-    std::vector<Server> servers = parser.getServers();
-    std::vector<ServerConfig> serverConfigs;
-
-    for (size_t i = 0; i < servers.size(); ++i) {
-        ServerConfig config;
-        config.host = servers[i].instruct["host"];
-        config.port = atoi(servers[i].instruct["listen"].c_str());
-        serverConfigs.push_back(config);
-    }
-
-    if (!handler.initServers(serverConfigs)) {
-        write(2, "Failed to initialize servers\n", 29);
-        return 1;
-    }
-    
-    PollManager pollManager(handler, parser);
-    if (!pollManager.init())
-    {
-        write(2, "Failed to initialize poll\n", 26);
-        return 1;
-    }
-
-    write(1, "Server initialized and ready\n", 29);
-    write(1, "Starting server...\n", 19);
-    
-    pollManager.run();
+    runServer(parser);
     
     return 0;
 }

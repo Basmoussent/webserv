@@ -6,11 +6,11 @@ CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -Iinc
 SRCS = main.cpp \
        srcs/Request.cpp \
        srcs/Handler.cpp \
-       srcs/Server.cpp \
        srcs/parsingConfig/ConfigParser.cpp \
        srcs/parsingConfig/ConfigUtils.cpp \
        srcs/parsingConfig/ConfigValid.cpp \
        srcs/network/SocketHandler.cpp \
+       srcs/Server.cpp \
        srcs/network/PollManager.cpp
 
 BUILD_DIR = build

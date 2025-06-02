@@ -10,21 +10,29 @@ request = (
     "\r\n"
     "4\r\n"
     "test\r\n"
+    "4\r\n"
+    "polo\r\n"
+    "4\r\n"
+    "loko\r\n"
     "0\r\n"
     "\r\n"
 )
 
 # Envoyer via un socket
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.settimeout(1)  # délai en secondes
     s.connect(("127.0.0.1", 8002))
     s.sendall(request.encode())
 
-    # Lire la réponse
     response = b""
-    while True:
-        data = s.recv(4096)
-        if not data:
-            break
-        response += data
+    try:
+        while True:
+            data = s.recv(4096)
+            if not data:
+                break
+            response += data
+    except socket.timeout:
+        print("Timeout atteint lors de la lecture de la réponse")
 
 print(response.decode())
+

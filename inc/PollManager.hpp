@@ -1,15 +1,16 @@
 #pragma once
 
+#include "SocketHandler.hpp"
 #include <vector>
 #include <poll.h>
-#include <map>
-#include "SocketHandler.hpp"
-#include "Handler.hpp"
+#include <algorithm>
 #include "ConfigParser.hpp"
+#include "Request.hpp"
+#include "Handler.hpp"
 
 class PollManager {
 public:
-    PollManager(SocketHandler& socketHandler, ConfigParser& configParser);
+    PollManager(SocketHandler& handler, ConfigParser& configParser);
     ~PollManager();
 
     bool init();     // add all listening sockets into the internal poll array
@@ -19,12 +20,11 @@ private:
     void addToPoll(int fd, short events);
     void removeFromPoll(int fd);
 
-    void handleNewConnection(int server_fd);
-    void handleClientData(int client_fd);
-    void cleanupHandlers();
-
-    std::map<int, Handler> _handlers;
-    std::vector<struct pollfd> _pollfds;
     SocketHandler& _socketHandler;
     ConfigParser& _configParser;
+    std::vector<struct pollfd> _pollfds;
+    std::map<int, Handler*> _handlers;
+    std::string _buffer;
+    
+    void cleanupHandlers();
 };

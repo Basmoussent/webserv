@@ -4,14 +4,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
-#include <netinet/in.h>
-#include <algorithm>
-#include "Handler.hpp"
-#include "Request.hpp"
-#include "ConfigParser.hpp"
-#include <utility>
-
-#define MESSAGE_BUFFER 4096
+#include <netinet/in.h>  // Pour sockaddr_in
 
 // Helper pour mettre un fd en non-bloquant
 static void setNonBlocking(int fd) {
@@ -22,7 +15,17 @@ static void setNonBlocking(int fd) {
 }
 
 PollManager::PollManager(SocketHandler& socketHandler, ConfigParser& configParser)
-    : _socketHandler(socketHandler), _configParser(configParser) {}
+    : _socketHandler(socketHandler), _configParser(configParser) {
+    // Initialisation des pollfds avec les sockets du SocketHandler
+    const std::vector<int>& sockets = _socketHandler.getServerSockets();
+    for (std::vector<int>::const_iterator it = sockets.begin(); it != sockets.end(); ++it) {
+        pollfd pfd;
+        pfd.fd = *it;
+        pfd.events = POLLIN;
+        pfd.revents = 0;
+        _pollfds.push_back(pfd);
+    }
+}
 
 PollManager::~PollManager() {
     cleanupHandlers();
@@ -32,7 +35,8 @@ PollManager::~PollManager() {
 }
 
 void PollManager::cleanupHandlers() {
-    for (std::map<int, Handler>::iterator it = _handlers.begin(); it != _handlers.end(); ++it) {
+    for (std::map<int, Handler*>::iterator it = _handlers.begin(); it != _handlers.end(); ++it) {
+        delete it->second;
     }
     _handlers.clear();
 }
@@ -57,39 +61,26 @@ bool PollManager::init() {
 }
 
 void PollManager::run() {
-    write(1, "[DEBUG] Démarrage boucle poll\n", 30);
+    std::map<int, std::string> clientBuffers;
+    
     while (true) {
-        if (_pollfds.empty()) {
-            write(2, "[ERROR] Aucun FD dans le poll, arrêt.\n", 38);
-            break;
+        int ready = poll(&_pollfds[0], _pollfds.size(), -1);
+        if (ready < 0) {
+            write(2, "[ERROR] poll() failed\n", 22);
+            continue;
         }
 
-        int ret = poll(_pollfds.data(), _pollfds.size(), -1);
-        if (ret < 0) {
-            write(2, "[ERROR] poll() a échoué, arrêt du serveur\n", 42);
-            break;
-        }
-        write(1, "[DEBUG] poll() a renvoyé un événement\n", 39);
-
-        // Stocker les FDs à supprimer après avoir parcouru tout le tableau
         std::vector<int> to_remove;
 
-        // Parcours EN ARRIÈRE pour pouvoir effacer sans casser l'itération
         for (int idx = static_cast<int>(_pollfds.size()) - 1; idx >= 0; --idx) {
-            struct pollfd &pfd = _pollfds[idx];
+            struct pollfd& pfd = _pollfds[idx];
 
-            // 1) Si poll() dit qu'il y a une erreur ou fermeture
-            if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
-                char buf[64];
-                snprintf(buf, sizeof(buf),
-                         "[ERROR] FD %d invalide (revents=0x%x). Suppression.\n",
-                         pfd.fd, pfd.revents);
-                write(2, buf, strlen(buf));
+            if (pfd.revents & (POLLHUP | POLLERR | POLLNVAL)) {
+                write(1, "[DEBUG] Erreur ou déconnexion détectée\n", 40);
                 to_remove.push_back(pfd.fd);
                 continue;
             }
 
-            // 2) Si c'est POLLIN : on distingue serveur ou client
             if (pfd.revents & POLLIN) {
                 std::vector<int> servers = _socketHandler.getServerSockets();
                 bool is_server = (std::find(servers.begin(),
@@ -110,103 +101,103 @@ void PollManager::run() {
                         continue;
                     }
 
-                    // Mettre client en non-bloquant
                     setNonBlocking(client_fd);
 
-                    // On ajoute la socket client à poll pour la prochaine itération
+                    // Ajouter le client à poll
                     struct pollfd new_pfd;
                     new_pfd.fd      = client_fd;
                     new_pfd.events  = POLLIN;
                     new_pfd.revents = 0;
                     _pollfds.push_back(new_pfd);
+                    
+                    // Initialiser le buffer pour ce client
+                    clientBuffers[client_fd] = "";
                     write(1, "[DEBUG] Client FD ajouté à poll\n", 33);
                 }
                 else {
-                    // On a des données à lire sur un client existant
+                    // Données à lire sur un client existant
                     write(1, "[DEBUG] Données dispo sur socket client\n", 41);
 
-                    std::map<int, Handler>::iterator handler_it = _handlers.find(pfd.fd);
-                    if (handler_it == _handlers.end()) {
-                        // Nouvelle requête
-                        char buffer[MESSAGE_BUFFER];
-                        memset(buffer, 0, sizeof(buffer));
-                        ssize_t bytes_read = read(pfd.fd, buffer, sizeof(buffer) - 1);
+                    char buffer[1024];
+                    int bytes = recv(pfd.fd, buffer, sizeof(buffer) - 1, 0);
+                    if (bytes <= 0) {
+                        write(1, "[DEBUG] Fermeture du client détectée\n", 38);
+                        clientBuffers.erase(pfd.fd);
+                        to_remove.push_back(pfd.fd);
+                        continue;
+                    }
+
+                    buffer[bytes] = '\0';
+                    
+                    // Accumuler les données dans le buffer du client
+                    if (clientBuffers.find(pfd.fd) == clientBuffers.end()) {
+                        clientBuffers[pfd.fd] = "";
+                    }
+                    clientBuffers[pfd.fd] += std::string(buffer, bytes);
+
+                    write(1, "[DEBUG] Données reçues et accumulées\n", 38);
+
+                    // Vérifier si on a une requête HTTP complète
+                    std::string& fullBuffer = clientBuffers[pfd.fd];
+                    if (fullBuffer.find("\r\n\r\n") != std::string::npos) {
+                        write(1, "[DEBUG] Requête HTTP complète détectée\n", 40);
                         
-                        if (bytes_read == 0) {
-                            write(2, "[ERROR] Connexion fermée par le client\n", 41);
-                            to_remove.push_back(pfd.fd);
-                            continue;
-                        }
-                        else if (bytes_read < 0) {
-                            write(2, "[ERROR] Erreur de lecture\n", 26);
-                            to_remove.push_back(pfd.fd);
-                            continue;
-                        }
-                        else if (bytes_read > 0) {
-                            Request request;
-                            request.feed(buffer, bytes_read);
-                            Handler handler(request, _configParser);
-                            _handlers.insert(std::make_pair(pfd.fd, handler));
-
-                            // Si la requête n'est pas complète, continuer à lire
-                            if (!request.isComplete()) {
-                                pfd.events = POLLIN;
-                                continue;
-                            }
-
-                            // Traiter la requête complète
+                        try {
+                            // Créer un objet Request avec les données reçues
+                            Request request(fullBuffer);
                             
-
-                            handler.process();
-                            if (handler.getStatusCode() != -1)
-                            {
-                                // Envoyer la réponse
-                                std::string response = handler.getResponse();
-                                write(pfd.fd, response.c_str(), response.length());
-
-                                // Marquer pour suppression
+                            if (request.isValid()) {
+                                write(1, "[DEBUG] Requête valide, création du Handler\n", 45);
+                                
+                                // Créer un Handler pour traiter la requête
+                                Handler* handler = new Handler(request, _configParser);
+                                _handlers[pfd.fd] = handler;
+                                
+                                // Obtenir la réponse du Handler
+                                std::string response = handler->getResponse();
+                                
+                                // Envoyer la réponse au client
+                                int sent = send(pfd.fd, response.c_str(), response.length(), 0);
+                                if (sent < 0) {
+                                    write(2, "[ERROR] Envoi de la réponse échoué\n", 36);
+                                    to_remove.push_back(pfd.fd);
+                                } else {
+                                    write(1, "[DEBUG] Réponse envoyée avec succès\n", 37);
+                                    
+                                    // Vérifier si la connexion doit être maintenue
+                                    std::string connection = request.getHeader("Connection");
+                                    if (connection == "close") {
+                                        write(1, "[DEBUG] Client demande la fermeture de la connexion\n", 52);
+                                        to_remove.push_back(pfd.fd);
+                                    } else {
+                                        clientBuffers[pfd.fd] = "";
+                                    }
+                                }
+                                delete handler;
+                                _handlers.erase(pfd.fd);
+                            } else {
+                                write(1, "[DEBUG] Requête invalide\n", 26);
+                                // Envoyer une erreur 400
+                                std::string errorResponse = "HTTP/1.1 400 Bad Request\r\nContent-Length: 11\r\nConnection: close\r\n\r\nBad Request";
+                                send(pfd.fd, errorResponse.c_str(), errorResponse.length(), 0);
                                 to_remove.push_back(pfd.fd);
                             }
+                        } catch (...) {
+                            write(2, "[ERROR] Exception lors du traitement de la requête\n", 53);
+                            // Envoyer une erreur 500
+                            std::string errorResponse = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 21\r\nConnection: close\r\n\r\nInternal Server Error";
+                            send(pfd.fd, errorResponse.c_str(), errorResponse.length(), 0);
+                            to_remove.push_back(pfd.fd);
                         }
-                    } else {
-                        // Continuer la lecture de la requête existante
-                        char buffer[MESSAGE_BUFFER];
-                        memset(buffer, 0, sizeof(buffer));
-                        ssize_t bytes_read = read(pfd.fd, buffer, sizeof(buffer) - 1);
                         
-                        if (bytes_read == 0) {
-                            write(2, "[ERROR] Connexion fermée par le client\n", 41);
-                            to_remove.push_back(pfd.fd);
-                            continue;
-                        }
-                        else if (bytes_read < 0) {
-                            write(2, "[ERROR] Erreur de lecture\n", 26);
-                            to_remove.push_back(pfd.fd);
-                            continue;
-                        }
-                        else if (bytes_read > 0) {
-                            // Ajouter les nouvelles données à la requête existante
-                            Request& request = handler_it->second.getRequest();
-                            request.feed(buffer, bytes_read);
-
-                            // Vérifier si la requête est maintenant complète
-                            if (request.isComplete()) {
-                                // Traiter la requête complète
-                                handler_it->second.process();
-
-                                // Envoyer la réponse
-                                std::string response = handler_it->second.getResponse();
-                                write(pfd.fd, response.c_str(), response.length());
-
-                                // Marquer pour suppression
-                                to_remove.push_back(pfd.fd);
-                            }
+                        // Nettoyer le buffer seulement si on ferme la connexion
+                        if (std::find(to_remove.begin(), to_remove.end(), pfd.fd) != to_remove.end()) {
+                            clientBuffers.erase(pfd.fd);
                         }
                     }
                 }
             }
 
-            // On réinitialise revents comme auparavant
             pfd.revents = 0;
         }
 
@@ -229,21 +220,16 @@ void PollManager::addToPoll(int fd, short events) {
 }
 
 void PollManager::removeFromPoll(int fd) {
-    // Nettoyer le handler avant de fermer le fd
-    std::map<int, Handler>::iterator it = _handlers.find(fd);
-    if (it != _handlers.end()) {
-        _handlers.erase(it);
+    std::map<int, Handler*>::iterator handler_it = _handlers.find(fd);
+    if (handler_it != _handlers.end()) {
+        delete handler_it->second;
+        _handlers.erase(handler_it);
     }
-
-    for (std::vector<struct pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
+    
+    for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
         if (it->fd == fd) {
-            close(fd);
-            char buf[64];
-            snprintf(buf, sizeof(buf),
-                     "[DEBUG] Fermeture & suppression FD %d du poll\n", fd);
-            write(1, buf, strlen(buf));
             _pollfds.erase(it);
-            return;
+            break;
         }
     }
 }
