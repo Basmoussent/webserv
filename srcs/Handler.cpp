@@ -492,15 +492,15 @@ void Handler::handleGet(Server serv, int j)
         return;
     }
     if (S_ISDIR(buffer.st_mode)) {
-        if (uri[uri.length() - 1] != '/') {
-            setStatusCode(301);
-            std::string redirectUrl = uri + "/";
-            std::string response = "HTTP/1.1 301 Moved Permanently\r\n";
-            response += "Location: " + redirectUrl + "\r\n";
-            response += "\r\n";
-            _response = response;
-            return;
-        }
+        // if (uri[uri.length() - 1] != '/') {
+        //     setStatusCode(301);
+        //     std::string redirectUrl = uri + "/";
+        //     std::string response = "HTTP/1.1 301 Moved Permanently\r\n";
+        //     response += "Location: " + redirectUrl + "\r\n";
+        //     response += "\r\n";
+        //     _response = response;
+        //     return;
+        // } A implementer si t'as la foi
         std::string indexPath = fullPath + index;
         if (stat(indexPath.c_str(), &buffer) == 0) {
             fullPath = indexPath;

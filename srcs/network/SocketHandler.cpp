@@ -7,8 +7,23 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <stdio.h>
+#include <sys/resource.h>
 
-SocketHandler::SocketHandler() {}
+SocketHandler::SocketHandler() {
+    // Augmenter la limite de file descriptors
+    struct rlimit rlim;
+    if (getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
+        rlim.rlim_cur = rlim.rlim_max;
+        if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
+            write(2, "[WARNING] Impossible d'augmenter la limite de file descriptors\n", 65);
+        } else {
+            char buf[128];
+            snprintf(buf, sizeof(buf), "[DEBUG] Limite de file descriptors augmentée à %ld\n", (long)rlim.rlim_max);
+            write(1, buf, strlen(buf));
+        }
+    }
+}
+
 SocketHandler::~SocketHandler() {}
 
 int SocketHandler::createSocket(int port, const std::string& host) {
@@ -79,12 +94,6 @@ bool SocketHandler::initServers(const std::vector<ServerConfig>& servers) {
     for (size_t i = 0; i < servers.size(); ++i) {
         int port = servers[i].port;
         std::string host = servers[i].host;
-
-        char buf[128];
-        snprintf(buf, sizeof(buf),
-                 "[DEBUG] Creating socket on %s:%d\n",
-                 host.c_str(), port);
-        write(1, buf, strlen(buf));
 
         int sockfd = createSocket(port, host);
         if (sockfd < 0) {

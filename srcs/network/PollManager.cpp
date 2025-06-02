@@ -67,7 +67,8 @@ void stop_handler(int signum) {
     }
 }
 
-void PollManager::run() {
+void PollManager::run()
+{
     std::map<int, std::string> clientBuffers;
     signal(SIGINT, stop_handler);
     while (code == 0) {
@@ -168,11 +169,12 @@ void PollManager::run() {
                                     write(1, "[DEBUG] Réponse envoyée avec succès\n", 39);
                                     
                                     std::string connection = request.getHeader("Connection");
-                                    if (connection == "close") {
+                                    if (connection == "keep-alive") {
+                                        clientBuffers[pfd.fd] = "";
+                                    } else {
                                         write(1, "[DEBUG] Client demande la fermeture de la connexion\n", 52);
                                         to_remove.push_back(pfd.fd);
-                                    } else {
-                                        clientBuffers[pfd.fd] = "";
+                                        close(pfd.fd);
                                     }
                                 }
                                 delete handler;

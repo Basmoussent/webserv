@@ -394,7 +394,7 @@ class WebservTester:
         """Test des headers HTTP"""
         headers_tests = [
             ({}, "No additional headers"),
-            ({"Connection": "close"}, "Connection close"),
+            ({"Host": "127.0.0.1:8002", "Connection": "close"}, "Connection close"),
             ({"Connection": "keep-alive"}, "Connection keep-alive"),
             ({"Accept": "*/*"}, "Accept all"),
             ({"User-Agent": "TestBot/1.0"}, "Custom User-Agent"),
@@ -433,6 +433,206 @@ class WebservTester:
         except Exception as e:
             self.log_test("Very Long URL", False, str(e))
     
+    def test_aggressive_requests(self):
+        """Test des requêtes agressives qui pourraient faire échouer le serveur"""
+        aggressive_tests = [
+            # Test de requêtes avec des headers malformés
+            {
+                'headers': {'Content-Length': 'invalid'},
+                'description': 'Invalid Content-Length header'
+            },
+            {
+                'headers': {'Content-Length': '-1'},
+                'description': 'Negative Content-Length'
+            },
+            {
+                'headers': {'Content-Length': '999999999999999999999999'},
+                'description': 'Extremely large Content-Length'
+            },
+            # Test de requêtes avec des URLs malformées
+            {
+                'url': '/%00',
+                'description': 'Null byte in URL'
+            },
+            {
+                'url': '/%ff%fe',
+                'description': 'Invalid UTF-8 sequence'
+            },
+            {
+                'url': '/%2e%2e%2f%2e%2e%2f%2e%2e%2fetc/passwd',
+                'description': 'Path traversal with encoding'
+            },
+            # Test de requêtes avec des méthodes malformées
+            {
+                'method': 'GET ',
+                'description': 'Method with trailing space'
+            },
+            {
+                'method': 'GET/',
+                'description': 'Method without space'
+            },
+            # Test de requêtes avec des versions HTTP invalides
+            {
+                'headers': {'Connection': 'keep-alive\r\nX-Injected: header'},
+                'description': 'Header injection attempt'
+            }
+        ]
+
+        for test in aggressive_tests:
+            try:
+                method = test.get('method', 'GET')
+                url = test.get('url', self.base_url)
+                headers = test.get('headers', {})
+                
+                # Créer une requête HTTP brute
+                request = f"{method} {url} HTTP/1.1\r\n"
+                for key, value in headers.items():
+                    request += f"{key}: {value}\r\n"
+                request += "\r\n"
+                
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)
+                sock.connect((self.server_config['host'], self.server_config['port']))
+                sock.send(request.encode())
+                response = sock.recv(1024)
+                sock.close()
+                
+                # Le serveur ne devrait pas crasher
+                self.log_test(f"Aggressive Test: {test['description']}", 
+                            response and len(response) > 0,
+                            f"Response: {response[:100]}")
+            except Exception as e:
+                self.log_test(f"Aggressive Test: {test['description']}", False, str(e))
+
+    def test_connection_handling(self):
+        """Test de la gestion des connexions"""
+        connection_tests = [
+            # Test de fermeture brutale de connexion
+            {
+                'action': 'close_abruptly',
+                'description': 'Abrupt connection close'
+            },
+            # Test de connexion sans envoi de données
+            {
+                'action': 'connect_only',
+                'description': 'Connect without sending data'
+            },
+            # Test de connexion avec envoi partiel
+            {
+                'action': 'partial_send',
+                'description': 'Partial request send'
+            }
+        ]
+
+        for test in connection_tests:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)
+                sock.connect((self.server_config['host'], self.server_config['port']))
+                
+                if test['action'] == 'close_abruptly':
+                    sock.close()
+                    time.sleep(1)
+                    # Vérifier si le serveur est toujours en vie
+                    self.log_test(f"Connection Test: {test['description']}", 
+                                self.is_server_running(),
+                                "Server should not crash")
+                elif test['action'] == 'connect_only':
+                    time.sleep(5)
+                    sock.close()
+                    self.log_test(f"Connection Test: {test['description']}", 
+                                self.is_server_running(),
+                                "Server should handle idle connections")
+                elif test['action'] == 'partial_send':
+                    sock.send(b"GET / HTTP/1.1\r\nHost: ")
+                    time.sleep(1)
+                    sock.close()
+                    self.log_test(f"Connection Test: {test['description']}", 
+                                self.is_server_running(),
+                                "Server should handle partial requests")
+            except Exception as e:
+                self.log_test(f"Connection Test: {test['description']}", False, str(e))
+
+    def test_resource_exhaustion(self):
+        """Test d'épuisement des ressources"""
+        # Test avec beaucoup de connexions simultanées
+        sockets = []
+        try:
+            for i in range(100):  # Essayer d'ouvrir 100 connexions
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)
+                sock.connect((self.server_config['host'], self.server_config['port']))
+                sockets.append(sock)
+                time.sleep(0.1)  # Petit délai pour éviter de surcharger trop rapidement
+            
+            self.log_test("Resource Exhaustion: Many Connections", 
+                        self.is_server_running(),
+                        f"Server should handle {len(sockets)} connections")
+        except Exception as e:
+            self.log_test("Resource Exhaustion: Many Connections", False, str(e))
+        finally:
+            for sock in sockets:
+                try:
+                    sock.close()
+                except:
+                    pass
+
+    def test_request_manipulation(self):
+        """Test de manipulation des requêtes"""
+        manipulation_tests = [
+            # Test de requêtes avec des tailles de corps incorrectes
+            {
+                'method': 'POST',
+                'headers': {'Content-Length': '10'},
+                'body': 'short',
+                'description': 'Content-Length mismatch (too short)'
+            },
+            {
+                'method': 'POST',
+                'headers': {'Content-Length': '5'},
+                'body': 'toolong',
+                'description': 'Content-Length mismatch (too long)'
+            },
+            # Test de requêtes avec des headers dupliqués
+            {
+                'headers': {
+                    'Host': 'localhost',
+                    'host': '127.0.0.1'
+                },
+                'description': 'Duplicate headers'
+            },
+            # Test de requêtes avec des valeurs de header invalides
+            {
+                'headers': {'Content-Length': 'abc'},
+                'description': 'Invalid header value'
+            }
+        ]
+
+        for test in manipulation_tests:
+            try:
+                method = test.get('method', 'GET')
+                headers = test.get('headers', {})
+                body = test.get('body', '')
+                
+                request = f"{method} / HTTP/1.1\r\n"
+                for key, value in headers.items():
+                    request += f"{key}: {value}\r\n"
+                request += "\r\n"
+                request += body
+                
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)
+                sock.connect((self.server_config['host'], self.server_config['port']))
+                sock.send(request.encode())
+                response = sock.recv(1024)
+                sock.close()
+                
+                self.log_test(f"Request Manipulation: {test['description']}", 
+                            response and len(response) > 0,
+                            f"Response: {response[:100]}")
+            except Exception as e:
+                self.log_test(f"Request Manipulation: {test['description']}", False, str(e))
+
     def run_all_tests(self):
         """Lance tous les tests"""
         print(f"{Colors.colorize('=== WEBSERV TESTER - Démarrage des tests ===', Colors.MAGENTA + Colors.BOLD)}\n")
@@ -441,39 +641,39 @@ class WebservTester:
         print(f"{Colors.colorize('Binaire:', Colors.BLUE)} {Colors.colorize(self.webserv_binary, Colors.WHITE)}\n")
         
         # Tests de base
-        self.test_server_startup()
         
-        if not self.is_server_running():
-            print(f"{Colors.colorize('❌ Le serveur ne répond pas. Arrêt des tests.', Colors.RED + Colors.BOLD)}")
-            return
+        print(f"\n{Colors.colorize('--- Tests des méthodes HTTP ---', Colors.CYAN + Colors.BOLD)}")
+        self.test_basic_http_methods()
+        self.test_location_methods()
         
-        # Tests fonctionnels
-        # print(f"\n{Colors.colorize('--- Tests des méthodes HTTP ---', Colors.CYAN + Colors.BOLD)}")
-        # self.test_basic_http_methods()
-        # self.test_location_methods()
         
-        # msg = "--- Tests des pages d'erreur ---"
-        # print(f'\n{Colors.colorize(msg, Colors.CYAN + Colors.BOLD)}')
-        # self.test_error_pages()
+        print(f"\n{Colors.colorize('--- Tests des error page---', Colors.CYAN + Colors.BOLD)}")
+        self.test_error_pages()
         
-        # print(f"\n{Colors.colorize('--- Tests des fonctionnalités ---', Colors.CYAN + Colors.BOLD)}")
-        # self.test_cgi_execution()
-        # self.test_autoindex()
+        print(f"\n{Colors.colorize('--- Tests des fonctionnalités ---', Colors.CYAN + Colors.BOLD)}")
+        self.test_cgi_execution()
+        self.test_autoindex()
         
-        # print(f"\n{Colors.colorize('--- Tests des cas limites ---', Colors.CYAN + Colors.BOLD)}")
-        # self.test_edge_cases()
-        # self.test_malformed_requests()
+        print(f"\n{Colors.colorize('--- Tests des cas limites ---', Colors.CYAN + Colors.BOLD)}")
+        self.test_edge_cases()
+        self.test_malformed_requests()
+        
+        print(f"\n{Colors.colorize('--- Tests agressifs ---', Colors.CYAN + Colors.BOLD)}")
+        self.test_aggressive_requests()
+        self.test_connection_handling()
+        self.test_resource_exhaustion()
+        self.test_request_manipulation()
         
         print(f"\n{Colors.colorize('--- Tests de performance ---', Colors.CYAN + Colors.BOLD)}")
-        # self.test_concurrent_requests()
+        self.test_concurrent_requests()
         self.test_large_request_body()
         
-        # print(f"\n{Colors.colorize('--- Tests de stress ---', Colors.CYAN + Colors.BOLD)}")
-        # self.test_http_headers()
-        # self.test_stress_conditions()
+        print(f"\n{Colors.colorize('--- Tests de stress ---', Colors.CYAN + Colors.BOLD)}")
+        self.test_http_headers()
+        self.test_stress_conditions()
         
-        # # Arrêt du serveur
-        # self.stop_webserv()
+        # Arrêt du serveur
+        self.stop_webserv()
         
         # Résumé
         self.print_summary()
