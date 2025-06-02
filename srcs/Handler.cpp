@@ -128,6 +128,7 @@ void Handler::process()
 	{
 		setStatusCode(400);
 		_response = buildResponse(400, "Bad Request 1", "text/plain");
+        std::cout << "Invalid request: " << _request << std::endl;
 	}
 }
 
@@ -861,7 +862,8 @@ void Handler::setResponse(const std::string& response)
 
 void Handler::setValid(bool isValid)
 {
-	_isValid = isValid;
+	std::cout << "Setting Handler valid to: " << isValid << std::endl;
+    _isValid = isValid;
 }
 
 void Handler::clear()

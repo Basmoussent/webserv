@@ -10,7 +10,7 @@ Request::Request() : _isValid(false), _headersParsed(false), _contentLength(0)
 
 }
 
-Request::Request(const std::string& raw_request) : _isValid(false), _headersParsed(false), _contentLength(0)
+Request::Request(const std::string& raw_request) : _isValid(true), _headersParsed(false), _contentLength(0)
 {
 	_rawRequest = raw_request;
 	parseRequest(raw_request);
@@ -74,6 +74,7 @@ void Request::setMethod(const std::string method)
 	else
 	{
 		_method = "UNKNOWN";
+		std::cout << "Invalid method: " << method << std::endl;
 		setValid(false);
 	}	
 }
@@ -88,11 +89,9 @@ void Request::setHttpVersion(const std::string httpVersion)
 	_httpVersion = httpVersion;
 	if (httpVersion != "HTTP/1.1")
 	{
+		std::cout << "Invalid HTTP version: " << httpVersion << std::endl;
 		setValid(false);
-
 	}
-	else
-		setValid(true);
 }
 
 void Request::setHeader(const std::string key, const std::string value)
@@ -193,9 +192,7 @@ void Request::parseRequest(const std::string raw_request)
 	std::string body_section;
 
 	if (std::getline(request_stream, request_line) && !request_line.empty())
-	{
 		parseRequestLine(request_line);
-	}
 	while (std::getline(request_stream, header_line))
 	{
 		if (header_line == "\r" || header_line.empty())
@@ -207,6 +204,7 @@ void Request::parseRequest(const std::string raw_request)
 	parseBody(request_stream, body_section);
 	if (!_chunked && getHeader("Host").empty())
 	{
+		std::cout << "Missing Host header in request" << std::endl;
 		setValid(false);	
 	}
 }
@@ -292,16 +290,10 @@ void Request::parseRequestLine(const std::string request_line)
 		}
 		setUri(uri);
 		setHttpVersion(http_version);
-		if (http_version != "HTTP/1.1")
-		{
-			setValid(false);
-			std::cerr << "Invalid HTTP version: " << http_version << std::endl;
-		}
-		else
-			setValid(true);
 	}
 	else
 	{
+		std::cout << "Invalid request line: " << request_line << std::endl;
 		setValid(false);
 	}
 }
@@ -359,6 +351,10 @@ std::ostream& operator<<(std::ostream& os, const Request& request)
 		os << it->first << ": " << it->second << "\n";
 	}
 	os << "Body: \n" << request.getBody();
+	if (request.isValid())
+		os << "\nRequest is valid.\n";
+	else
+		os << "\nRequest is invalid.\n";
 	return os;
 }
 
@@ -413,7 +409,6 @@ void Request::clear() {
 	_boundary.clear();
 	_multiform = false;
 	_chunked = false;
-	_isValid = false;
 	_headersParsed = false;
 	_contentLength = 0;
 	_rawRequest.clear();

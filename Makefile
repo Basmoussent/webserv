@@ -7,7 +7,6 @@ SRCS = main.cpp \
        srcs/Request.cpp \
        srcs/Handler.cpp \
        srcs/Server.cpp \
-       srcs/testsrequests.cpp \
        srcs/parsingConfig/ConfigParser.cpp \
        srcs/parsingConfig/ConfigUtils.cpp \
        srcs/parsingConfig/ConfigValid.cpp \
