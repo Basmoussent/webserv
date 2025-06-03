@@ -69,7 +69,7 @@ void Request::feed(char *buffer, size_t bytes_read)
 // Setters
 void Request::setMethod(const std::string method)
 {
-	if (method == "GET" || method == "POST" || method == "DELETE")
+	if (method == "GET" || method == "POST" || method == "DELETE" || method == "HEAD")
 		_method = method;
 	else
 	{

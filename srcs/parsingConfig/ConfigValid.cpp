@@ -149,7 +149,7 @@ bool ConfigParser::isValidMethods(const std::string& val) const
 	
 	while (iss >> method)
 	{
-		if (method != "GET" && method != "POST" && method != "DELETE")
+		if (method != "GET" && method != "POST" && method != "DELETE" && method != "HEAD")
 			return false;
 	}
 	return true;

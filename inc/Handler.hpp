@@ -51,6 +51,8 @@ public:
 
     void clear();
 
+    void handleHead(Server serv, int j);
+
 };
 std::ostream& operator<<(std::ostream& os, const Handler& handler);
 

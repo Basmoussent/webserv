@@ -64,16 +64,32 @@ void Handler::process()
             return;
         }
 
-        if (_request.getMethod() == "POST") {
-            std::string contentLength = _request.getHeader("Content-Length");
-            if (!contentLength.empty()) {
-                size_t bodySize = std::atoi(contentLength.c_str());
-                size_t maxSize = std::atoi(server.instruct["client_max_body_size"].c_str());
-                if (bodySize > maxSize) {
-                    setStatusCode(413);
-                    _response = buildResponse(413, "Request Entity Too Large", "text/plain");
-                    return;
+        std::string contentLength = _request.getHeader("Content-Length");
+        if (!contentLength.empty()) {
+            size_t bodySize = std::atoi(contentLength.c_str());
+            size_t maxSize = 0;
+            bool locationFound = false;
+            size_t j = 0;
+            for (j = 0; j < server.locations.size(); j++) {
+                if (server.locations[j].path == _request.getUri()) {
+                    locationFound = true;
+                    if (!server.locations[j].instruct["client_max_body_size"].empty()) {
+                        maxSize = std::atoi(server.locations[j].instruct["client_max_body_size"].c_str());
+                    }
+                    break;
                 }
+            }
+            
+            if (!locationFound || maxSize == 0) {
+                if (!server.instruct["client_max_body_size"].empty()) {
+                    maxSize = std::atoi(server.instruct["client_max_body_size"].c_str());
+                }
+            }
+            
+            if (maxSize > 0 && bodySize > maxSize) {
+                setStatusCode(413);
+                _response = buildResponse(413, "Request Entity Too Large", "text/plain");
+                return;
             }
         }
 
@@ -86,14 +102,14 @@ void Handler::process()
                 std::string allowedMethods = server.locations[j].instruct["allow_methods"];
                 if (allowedMethods.find(_request.getMethod()) == std::string::npos)
                 {
-                    if (_request.getMethod() != "GET" &&  _request.getMethod() != "POST" && _request.getMethod() != "DELETE")
+                    if (_request.getMethod() != "GET" &&  _request.getMethod() != "POST" && _request.getMethod() != "DELETE" && _request.getMethod() != "HEAD")
                     {
                         setStatusCode(501);
                         _response = buildResponse(501, "Method Not Allowed", "text/plain");
                         return;
                     }
                     setStatusCode(405);
-                    _response = buildResponse(405, "Method Not Allowed", "text/plain");
+                    _response = buildResponse(405, "Method Not Supported", "text/plain");
                     return;
                 }
                 locationFound = true;
@@ -122,6 +138,8 @@ void Handler::process()
 			handlePost(server.locations[j].path);
 		else if (_request.getMethod() == "DELETE")
 			handleDelete();
+        else if (_request.getMethod() == "HEAD")
+            handleHead(server, j);
 		setValid(true);
 	}
 	else
@@ -828,6 +846,42 @@ void Handler::handleDelete()
     }
 }
 
+void Handler::handleHead(Server serv, int j) {
+    std::string path = serv.instruct["root"] + _request.getUri();
+    struct stat buffer;
+    
+    if (stat(path.c_str(), &buffer) == 0) {
+        if (S_ISDIR(buffer.st_mode)) {
+            std::string autoindex = serv.locations[j].instruct["autoindex"];
+            if (autoindex == "on") {
+                setStatusCode(200);
+                _response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 0\r\n\r\n";
+                return;
+            } else {
+                std::string index = serv.locations[j].instruct["index"];
+                if (!index.empty()) {
+                    path += "/" + index;
+                    if (stat(path.c_str(), &buffer) == 0) {
+                        setStatusCode(200);
+                        _response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 0\r\n\r\n";
+                        return;
+                    }
+                }
+                setStatusCode(403);
+                _response = "HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\nContent-Length: 0\r\n\r\n";
+                return;
+            }
+        } else {
+            setStatusCode(200);
+            std::string contentType = getMimeType(path);
+            _response = "HTTP/1.1 200 OK\r\nContent-Type: " + contentType + "\r\nContent-Length: 0\r\n\r\n";
+            return;
+        }
+    }
+    
+    setStatusCode(404);
+    _response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 0\r\n\r\n";
+}
 
 int Handler::getStatusCode() const
 {
