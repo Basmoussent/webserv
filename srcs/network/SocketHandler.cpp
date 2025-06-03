@@ -10,18 +10,6 @@
 #include <sys/resource.h>
 
 SocketHandler::SocketHandler() {
-    // Augmenter la limite de file descriptors
-    struct rlimit rlim;
-    if (getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
-        rlim.rlim_cur = rlim.rlim_max;
-        if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
-            write(2, "[WARNING] Impossible d'augmenter la limite de file descriptors\n", 65);
-        } else {
-            char buf[128];
-            snprintf(buf, sizeof(buf), "[DEBUG] Limite de file descriptors augmentée à %ld\n", (long)rlim.rlim_max);
-            write(1, buf, strlen(buf));
-        }
-    }
 }
 
 SocketHandler::~SocketHandler() {}
