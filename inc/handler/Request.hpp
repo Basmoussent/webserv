@@ -52,11 +52,11 @@ public:
     void setUri(const std::string uri);
     void setHttpVersion(const std::string httpVersion);
     void setHeader(const std::string key, const std::string value);
-    void setBody(const std::string body);
+    void setBody(const std::string& body);
     void setQueryString(const std::string queryString);
     void setValid(bool isValid);
 
-    void feed(char *buffer, size_t bytes_read);
+    void feed(const char* buffer, size_t bytes_read);
 
     // Parsers
     void parseRequest(const std::string raw_request);

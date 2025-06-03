@@ -1,18 +1,17 @@
-#include "Request.hpp"
+#include "Webserv.hpp"
 #include "stdio.h"
 #include <cstdlib>
 #include <sstream>
 #include <iostream>
 #include <vector>
 
-Request::Request() : _isValid(false), _headersParsed(false), _contentLength(0)
+Request::Request() : _method(), _uri(), _httpVersion(), _headers(), _body(), _query_String(), _host(), _boundary(), _multiform(false), _chunked(false), _isValid(false), _headersParsed(false), _contentLength(0), _rawRequest()
 {
 
 }
 
-Request::Request(const std::string& raw_request) : _isValid(true), _headersParsed(false), _contentLength(0)
+Request::Request(const std::string& raw_request) : _method(), _uri(), _httpVersion(), _headers(), _body(), _query_String(), _host(), _boundary(), _multiform(false), _chunked(false), _isValid(true), _headersParsed(false), _contentLength(0), _rawRequest(raw_request)
 {
-	_rawRequest = raw_request;
 	parseRequest(raw_request);
 }
 
@@ -23,7 +22,7 @@ Request::Request(const Request& other)
 
 Request::~Request()
 {
-
+	clear();
 }
 
 Request& Request::getRequest()
@@ -40,13 +39,24 @@ Request& Request::operator=(const Request& other)
 		_httpVersion = other._httpVersion;
 		_headers = other._headers;
 		_body = other._body;
+		_query_String = other._query_String;
+		_host = other._host;
+		_boundary = other._boundary;
+		_multiform = other._multiform;
+		_chunked = other._chunked;
 		_isValid = other._isValid;
+		_headersParsed = other._headersParsed;
+		_contentLength = other._contentLength;
+		_rawRequest = other._rawRequest;
 	}
 	return *this;
 }
 
-void Request::feed(char *buffer, size_t bytes_read)
+void Request::feed(const char* buffer, size_t bytes_read)
 {
+	if (!buffer || bytes_read == 0)
+		return;
+		
 	_rawRequest.append(buffer, bytes_read);
 	if (!_headersParsed)
 	{
@@ -101,7 +111,7 @@ void Request::setHeader(const std::string key, const std::string value)
 	_headers[key] = value.substr(start, end - start + 1);
 }
 
-void Request::setBody(const std::string body)
+void Request::setBody(const std::string& body)
 {
 	if (_method == "DELETE") {
 		size_t start = body.find_first_not_of(" \t\r\n");
@@ -244,6 +254,7 @@ void Request::parseBody(std::istringstream &request_stream, std::string &body_se
     } else {
         std::string line;
         bool isFirstLine = true;
+		std::cout << "Parsing body without chunked encoding" << std::endl;
         
         while (std::getline(request_stream, line)) {
             if (isFirstLine && line.empty()) {
@@ -258,7 +269,6 @@ void Request::parseBody(std::istringstream &request_stream, std::string &body_se
         }
     }
     setBody(body_section);
-	std::cout << "Parsed body: [" << this->_body << "]" << std::endl;
 
 	if (body_section.empty()) {
 		_contentLength = 0;

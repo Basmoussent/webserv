@@ -1,5 +1,5 @@
-#include "ConfigParser.hpp"
-#include "ConfigTypes.hpp"
+#include "Webserv.hpp"
+
 
 ConfigParser::ConfigParser()
 	: _blockDepth(0), _inServer(false), _inLocation(false)

@@ -1,5 +1,5 @@
-#include "ConfigParser.hpp"
-#include "ConfigTypes.hpp"
+#include "Webserv.hpp"
+
 
 bool ConfigParser::validateConfig() const
 {
@@ -94,10 +94,15 @@ bool	ConfigParser::isValidName(const std::string& val) const
 
 bool ConfigParser::isValidExtension(const std::string& s) const
 {
-	if (s == ".py .sh")
-		return true;
-	return false;
+    std::istringstream iss(s);
+    std::string token;
 
+    while (iss >> token) {
+        if (token != ".py" && token != ".sh") {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool ConfigParser::isInteger(const std::string& s) const
@@ -220,6 +225,7 @@ bool	ConfigParser::isValidRedirect(const std::string& val, const Location& loc, 
 	std::string path;
 
 	iss >> codeStr >> path;
+	if (!isInteger(codeStr))
 		return false;
 	int code = atoi(codeStr.c_str());
 	std::cout << "code : " << code << std::endl;

@@ -1,5 +1,4 @@
-#include "ConfigParser.hpp"
-#include "ConfigTypes.hpp"
+#include "Webserv.hpp"
 
 std::string ConfigParser::getInstruct(const std::string& key, const Server server) const
 {

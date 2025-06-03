@@ -1,4 +1,4 @@
-#include "Handler.hpp"
+#include "Webserv.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -23,14 +23,14 @@ std::string Handler::sizeToString(size_t value) {
     return ss.str();
 }
 
-Handler::Handler(Request& req, ConfigParser& configParser) : _request(req), _configParser(configParser), _statusCode(-1), _isValid(false)
+Handler::Handler(Request& request, ConfigParser& configParser)
+    : _request(request), _configParser(configParser), _statusCode(200), _isValid(true)
 {
-	process();
-    std::cout << _response << std::endl;
 }
 
 Handler::~Handler()
 {
+    clear();
 }
 
 Request& Handler::getRequest()
@@ -105,11 +105,11 @@ void Handler::process()
                     if (_request.getMethod() != "GET" &&  _request.getMethod() != "POST" && _request.getMethod() != "DELETE" && _request.getMethod() != "HEAD")
                     {
                         setStatusCode(501);
-                        _response = buildResponse(501, "Method Not Allowed", "text/plain");
+                        _response = buildResponse(501, "Not Implemented", "text/plain");
                         return;
                     }
                     setStatusCode(405);
-                    _response = buildResponse(405, "Method Not Supported", "text/plain");
+                    _response = buildResponse(405, "Method Not Allowed", "text/plain");
                     return;
                 }
                 locationFound = true;
@@ -126,7 +126,7 @@ void Handler::process()
         }
         if (!locationFound) {
             setStatusCode(404);
-            _response = "HTTP/1.1 404 Not Found 9\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nNot Found";
+            _response = buildResponse(404, "Not Found", "text/plain");
             return;
         }
 
@@ -145,7 +145,7 @@ void Handler::process()
 	else
 	{
 		setStatusCode(400);
-		_response = buildResponse(400, "Bad Request 1", "text/plain");
+		_response = buildResponse(400, "Bad Request", "text/plain");
         std::cout << "Invalid request: " << _request << std::endl;
 	}
 }
@@ -394,13 +394,17 @@ std::string Handler::buildResponse(int statusCode, const std::string& content, c
         case 401: statusText = "Unauthorized"; break;
         case 403: statusText = "Forbidden"; break;
         case 404: statusText = "Not Found"; break;
-        case 413: statusText = "Request Entity Too Large"; break;
         case 405: statusText = "Method Not Allowed"; break;
+        case 413: statusText = "Request Entity Too Large"; break;
         case 500: statusText = "Internal Server Error"; break;
+        case 501: statusText = "Not Implemented"; break;
         default: statusText = "Unknown";
     }
     
-    std::string response = "HTTP/1.1 " + intToString(statusCode) + " " + statusText + "\r\n";
+    std::string response;
+    response.reserve(512 + content.length()); // Pré-allouer de l'espace pour éviter les réallocations
+    
+    response = "HTTP/1.1 " + intToString(statusCode) + " " + statusText + "\r\n";
     response += "Content-Type: " + contentType + "\r\n";
     response += "Content-Length: " + sizeToString(content.length()) + "\r\n";
     if (statusCode == 405) 
@@ -460,10 +464,8 @@ void Handler::handleGet(Server serv, int j)
 {
     struct stat buffer;
     std::string root;
-    std::string index;
     std::string uri = _request.getUri();
     
-    std::cout << "Handling GET request for URI: " << uri << std::endl;
     if (uri.find("..") != std::string::npos) {
         std::string normalized = normalizePath(uri);
         std::cout << "Normalized URI: " << normalized << std::endl;
@@ -495,14 +497,27 @@ void Handler::handleGet(Server serv, int j)
     if (root.substr(0, 2) == "./") {
         root = root.substr(2);
     }
-    if (!serv.locations[j].instruct["index"].empty())
-        index = serv.locations[j].instruct["index"];
-    else if (!serv.instruct["index"].empty())
-        index = serv.instruct["index"];
-    else
-        index = "index.html";
+    std::vector<std::string> indexFiles;
+    if (!serv.locations[j].instruct["index"].empty()) {
+        std::istringstream iss(serv.locations[j].instruct["index"]);
+        std::string indexFile;
+        while (std::getline(iss, indexFile, ' ')) {
+            if (!indexFile.empty()) {
+                indexFiles.push_back(indexFile);
+            }
+        }
+    } else if (!serv.instruct["index"].empty()) {
+        std::istringstream iss(serv.instruct["index"]);
+        std::string indexFile;
+        while (std::getline(iss, indexFile, ' ')) {
+            if (!indexFile.empty()) {
+                indexFiles.push_back(indexFile);
+            }
+        }
+    } else {
+        indexFiles.push_back("index.html");
+    }
     std::string fullPath = root + (uri[0] == '/' ? uri : "/" + uri);
-    std::cout << "Full path: " << fullPath << std::endl;
     if (stat(fullPath.c_str(), &buffer) != 0) {
         setStatusCode(404);
         std::string errorPage = getErrorPage(404);
@@ -510,30 +525,27 @@ void Handler::handleGet(Server serv, int j)
         return;
     }
     if (S_ISDIR(buffer.st_mode)) {
-        // if (uri[uri.length() - 1] != '/') {
-        //     setStatusCode(301);
-        //     std::string redirectUrl = uri + "/";
-        //     std::string response = "HTTP/1.1 301 Moved Permanently\r\n";
-        //     response += "Location: " + redirectUrl + "\r\n";
-        //     response += "\r\n";
-        //     _response = response;
-        //     return;
-        // } A implementer si t'as la foi
-        std::string indexPath = fullPath + index;
-        if (stat(indexPath.c_str(), &buffer) == 0) {
-            fullPath = indexPath;
+        bool indexFound = false;
+        for (std::vector<std::string>::iterator it = indexFiles.begin(); it != indexFiles.end(); ++it) {
+            std::string indexPath = fullPath + "/" + *it;
+            if (stat(indexPath.c_str(), &buffer) == 0) {
+                fullPath = indexPath;
+                indexFound = true;
+                break;
+            }
         }
-        else if (serv.locations[j].instruct["autoindex"] == "on") {
-            std::string autoindexHtml = generateDirectoryListing(fullPath, uri);
-            setStatusCode(200);
-            _response = buildResponse(200, autoindexHtml, "text/html");
-            return;
-        }
-        else {
-            setStatusCode(403);
-            std::string errorPage = getErrorPage(403);
-            _response = buildResponse(403, errorPage, "text/html");
-            return;
+        if (!indexFound) {
+            if (serv.locations[j].instruct["autoindex"] == "on") {
+                std::string autoindexHtml = generateDirectoryListing(fullPath, uri);
+                setStatusCode(200);
+                _response = buildResponse(200, autoindexHtml, "text/html");
+                return;
+            } else {
+                setStatusCode(403);
+                std::string errorPage = getErrorPage(403);
+                _response = buildResponse(403, errorPage, "text/html");
+                return;
+            }
         }
     }
     
@@ -695,7 +707,6 @@ std::string Handler::extractContentFromMultipart(const std::string& body, const 
 void Handler::handlePost(std::string& path)
 {
     const std::string& body = _request.getBody();
-    
     std::string pathCheck = path;
     if (_request.getUri() != path && _request.getUri() != (pathCheck + "/"))
     {
@@ -762,7 +773,20 @@ void Handler::handlePost(std::string& path)
         return;
     }
 
-    std::string logBaseDir = "./log";
+    std::string root;
+    if (!location.instruct["root"].empty()) {
+        root = location.instruct["root"];
+    } else if (!server.instruct["root"].empty()) {
+        root = server.instruct["root"];
+    } else {
+        root = "./html";
+    }
+
+    if (root.substr(0, 2) == "./") {
+        root = root.substr(2);
+    }
+
+    std::string logBaseDir = root + "/log";
     struct stat st;
     if (stat(logBaseDir.c_str(), &st) != 0) {
         if (mkdir(logBaseDir.c_str(), 0755) != 0) {
@@ -829,10 +853,46 @@ void Handler::handleDelete()
         return;
     }
 
-    if (uri[0] == '/')
-        uri = uri.substr(1);
+    Server server;
+    Location location;
+    bool found = false;
+    
+    for (size_t i = 0; i < _configParser.getServers().size(); i++) {
+        server = _configParser.getServers()[i];
+        if (_request.getHeader("Host") == server.instruct["host"] + ":" + server.instruct["listen"] || 
+            _request.getHeader("Host") == server.instruct["server_name"]) {
+            for (size_t j = 0; j < server.locations.size(); j++) {
+                if (server.locations[j].path == "/" || uri.find(server.locations[j].path) == 0) {
+                    location = server.locations[j];
+                    found = true;
+                    break;
+                }
+            }
+            if (found) break;
+        }
+    }
 
-    if (remove(uri.c_str()) == 0)
+    if (!found) {
+        setStatusCode(404);
+        _response = buildResponse(404, "Not Found", "text/plain");
+        return;
+    }
+
+    std::string root;
+    if (!location.instruct["root"].empty()) {
+        root = location.instruct["root"];
+    } else if (!server.instruct["root"].empty()) {
+        root = server.instruct["root"];
+    } else {
+        root = "./html";
+    }
+
+    if (root.substr(0, 2) == "./") {
+        root = root.substr(2);
+    }
+
+    std::string fullPath = root + uri;
+    if (remove(fullPath.c_str()) == 0)
     {
         setStatusCode(200);
         std::string message = "File deleted successfully: " + uri;
@@ -847,7 +907,20 @@ void Handler::handleDelete()
 }
 
 void Handler::handleHead(Server serv, int j) {
-    std::string path = serv.instruct["root"] + _request.getUri();
+    std::string root;
+    if (!serv.locations[j].instruct["root"].empty()) {
+        root = serv.locations[j].instruct["root"];
+    } else if (!serv.instruct["root"].empty()) {
+        root = serv.instruct["root"];
+    } else {
+        root = "./html";
+    }
+
+    if (root.substr(0, 2) == "./") {
+        root = root.substr(2);
+    }
+
+    std::string path = root + _request.getUri();
     struct stat buffer;
     
     if (stat(path.c_str(), &buffer) == 0) {
@@ -858,10 +931,30 @@ void Handler::handleHead(Server serv, int j) {
                 _response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 0\r\n\r\n";
                 return;
             } else {
-                std::string index = serv.locations[j].instruct["index"];
-                if (!index.empty()) {
-                    path += "/" + index;
-                    if (stat(path.c_str(), &buffer) == 0) {
+                std::vector<std::string> indexFiles;
+                if (!serv.locations[j].instruct["index"].empty()) {
+                    std::istringstream iss(serv.locations[j].instruct["index"]);
+                    std::string indexFile;
+                    while (std::getline(iss, indexFile, ' ')) {
+                        if (!indexFile.empty()) {
+                            indexFiles.push_back(indexFile);
+                        }
+                    }
+                } else if (!serv.instruct["index"].empty()) {
+                    std::istringstream iss(serv.instruct["index"]);
+                    std::string indexFile;
+                    while (std::getline(iss, indexFile, ' ')) {
+                        if (!indexFile.empty()) {
+                            indexFiles.push_back(indexFile);
+                        }
+                    }
+                } else {
+                    indexFiles.push_back("index.html");
+                }
+
+                for (std::vector<std::string>::iterator it = indexFiles.begin(); it != indexFiles.end(); ++it) {
+                    std::string indexPath = path + "/" + *it;
+                    if (stat(indexPath.c_str(), &buffer) == 0) {
                         setStatusCode(200);
                         _response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 0\r\n\r\n";
                         return;
@@ -915,16 +1008,14 @@ void Handler::setResponse(const std::string& response)
 
 void Handler::setValid(bool isValid)
 {
-	std::cout << "Setting Handler valid to: " << isValid << std::endl;
     _isValid = isValid;
 }
 
 void Handler::clear()
 {
-    _request = Request();
-    _response = "";
-    _statusCode = 0;
-    _isValid = false;
+    _response.clear();
+    _statusCode = 200;
+    _isValid = true;
 }
 
 std::ostream& operator<<(std::ostream& os, const Handler& handler)

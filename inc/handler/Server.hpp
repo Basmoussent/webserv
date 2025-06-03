@@ -1,7 +1,7 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
-#include "ConfigParser.hpp"
+#include "Webserv.hpp"
 
 void runServer(ConfigParser& parser);
 

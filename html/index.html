@@ -2,70 +2,178 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Welcome - Webserv</title>
+    <title>Webserv Control Panel</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f4f7f9;
             color: #333;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
             margin: 0;
+            padding: 20px;
         }
 
         .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+
+        .form-section {
             background-color: white;
-            padding: 30px;
+            padding: 25px;
             border-radius: 10px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 400px;
+            margin-bottom: 30px;
+        }
+
+        .form-section h2 {
+            color: #2c3e50;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 1.5em;
         }
 
         label {
             font-size: 1.1em;
             display: block;
             margin-bottom: 10px;
+            color: #34495e;
         }
 
         input[type="text"] {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             font-size: 1em;
             border-radius: 5px;
-            border: 1px solid #ccc;
+            border: 1px solid #bdc3c7;
             margin-bottom: 15px;
+            box-sizing: border-box;
+            transition: border-color 0.3s ease;
         }
 
-        input[type="submit"] {
-            background-color: #2980b9;
+        input[type="text"]:focus {
+            border-color: #3498db;
+            outline: none;
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+        }
+
+        button {
+            background-color: #3498db;
             color: white;
-            padding: 10px;
+            padding: 12px 20px;
             border: none;
             font-size: 1em;
             border-radius: 5px;
             cursor: pointer;
             width: 100%;
+            transition: background-color 0.3s ease;
         }
 
-        input[type="submit"]:hover {
-            background-color: #1abc9c;
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        .delete-btn {
+            background-color: #e74c3c;
+        }
+
+        .delete-btn:hover {
+            background-color: #c0392b;
+        }
+
+        .head-btn {
+            background-color: #2ecc71;
+        }
+
+        .head-btn:hover {
+            background-color: #27ae60;
+        }
+
+        .response-section {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+            display: none;
+        }
+
+        .response-section pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .success {
+            border-left: 4px solid #2ecc71;
+        }
+
+        .error {
+            border-left: 4px solid #e74c3c;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <form id="customForm">
-            <label for="textInput">Enter your text:</label>
-            <input type="text" id="textInput" name="textInput" required>
-            <input type="submit" value="Send">
-        </form>
+        <div class="header">
+            <h1>Webserv Control Panel</h1>
+            <p>Manage your files and check server status</p>
+        </div>
+
+        <div class="form-section">
+            <h2>Send Text</h2>
+            <form id="sendForm">
+                <label for="textInput">Enter your text:</label>
+                <input type="text" id="textInput" name="textInput" required>
+                <button type="submit">Send Text</button>
+            </form>
+            <div id="sendResponse" class="response-section"></div>
+        </div>
+
+        <div class="form-section">
+            <h2>Delete File</h2>
+            <form id="deleteForm">
+                <label for="deletePath">Enter file path to delete:</label>
+                <input type="text" id="deletePath" name="deletePath" required placeholder="e.g., /path/to/file.txt">
+                <button type="submit" class="delete-btn">Delete File</button>
+            </form>
+            <div id="deleteResponse" class="response-section"></div>
+        </div>
+
+        <div class="form-section">
+            <h2>Check File Headers</h2>
+            <form id="headForm">
+                <label for="headPath">Enter file path to check:</label>
+                <input type="text" id="headPath" name="headPath" required placeholder="e.g., /path/to/file.txt">
+                <button type="submit" class="head-btn">Check Headers</button>
+            </form>
+            <div id="headResponse" class="response-section"></div>
+        </div>
     </div>
 
     <script>
-        document.getElementById('customForm').addEventListener('submit', function(e) {
+        function showResponse(elementId, response, isError = false) {
+            const responseElement = document.getElementById(elementId);
+            responseElement.style.display = 'block';
+            responseElement.className = 'response-section ' + (isError ? 'error' : 'success');
+            responseElement.innerHTML = '<pre>' + response + '</pre>';
+        }
+
+        document.getElementById('sendForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const textValue = document.getElementById('textInput').value;
 
@@ -77,12 +185,50 @@
                 body: textValue
             }).then(response => {
                 if (response.ok) {
-                    alert('Sent successfully!');
+                    return response.text().then(text => {
+                        showResponse('sendResponse', 'Status: ' + response.status + ' ' + response.statusText + '\n\nResponse:\n' + text);
+                    });
                 } else {
-                    alert('Failed to send.');
+                    return response.text().then(text => {
+                        showResponse('sendResponse', 'Status: ' + response.status + ' ' + response.statusText + '\n\nResponse:\n' + text, true);
+                    });
                 }
             }).catch(error => {
-                alert('Error: ' + error.message);
+                showResponse('sendResponse', 'Error: ' + error.message, true);
+            });
+        });
+
+        document.getElementById('deleteForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const filePath = document.getElementById('deletePath').value;
+
+            fetch(filePath, {
+                method: 'DELETE'
+            }).then(response => {
+                if (response.ok) {
+                    showResponse('deleteResponse', 'File deleted successfully!');
+                } else {
+                    showResponse('deleteResponse', 'Failed to delete file: ' + response.statusText, true);
+                }
+            }).catch(error => {
+                showResponse('deleteResponse', 'Error: ' + error.message, true);
+            });
+        });
+
+        document.getElementById('headForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const filePath = document.getElementById('headPath').value;
+
+            fetch(filePath, {
+                method: 'HEAD'
+            }).then(response => {
+                let headers = 'Status: ' + response.status + ' ' + response.statusText + '\n\n';
+                response.headers.forEach((value, key) => {
+                    headers += key + ': ' + value + '\n';
+                });
+                showResponse('headResponse', headers);
+            }).catch(error => {
+                showResponse('headResponse', 'Error: ' + error.message, true);
             });
         });
     </script>

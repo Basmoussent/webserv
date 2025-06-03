@@ -1,9 +1,12 @@
-#ifndef HANDLER_HPP
-#define HANDLER_HPP
+#pragma once
 
+#include "Webserv.hpp"
 #include <string>
-#include "Request.hpp"
-#include "ConfigParser.hpp"
+
+class ConfigParser;
+class Request;
+class Server;
+class Location;
 
 class Handler {
 private:
@@ -56,4 +59,3 @@ public:
 };
 std::ostream& operator<<(std::ostream& os, const Handler& handler);
 
-#endif

@@ -1,4 +1,4 @@
-#include "PollManager.hpp"
+#include "Webserv.hpp"
 #include <unistd.h>
 #include <sys/socket.h>
 #include <fcntl.h>
@@ -177,15 +177,14 @@ void PollManager::run()
                                         close(pfd.fd);
                                     }
                                 }
-                                delete handler;
-                                _handlers.erase(pfd.fd);
+                                // Le handler sera supprimé par cleanupHandlers() ou removeFromPoll()
                             } else {
                                 write(1, "[DEBUG] Requête invalide\n", 26);
                                 std::string errorResponse = "HTTP/1.1 400 Bad Request\r\nContent-Length: 11\r\nConnection: close\r\n\r\nBad Request";
                                 send(pfd.fd, errorResponse.c_str(), errorResponse.length(), 0);
                                 to_remove.push_back(pfd.fd);
                             }
-                        } catch (...) {
+                        } catch (const std::exception& e) {
                             write(2, "[ERROR] Exception lors du traitement de la requête\n", 53);
                             // Envoyer une erreur 500
                             std::string errorResponse = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 21\r\nConnection: close\r\n\r\nInternal Server Error";

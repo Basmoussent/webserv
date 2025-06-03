@@ -1,6 +1,4 @@
-#include "Server.hpp"
-#include "network/PollManager.hpp"
-#include "SocketHandler.hpp"
+#include "Webserv.hpp"
 #include <iostream>
 #include <cstdlib>
 

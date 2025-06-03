@@ -1,8 +1,4 @@
-#include "ConfigParser.hpp"
-#include "SocketHandler.hpp"
-#include "PollManager.hpp"
-#include "Handler.hpp"
-#include "Server.hpp"
+#include "Webserv.hpp"
 
 int main(int ac, char **av)
 {
