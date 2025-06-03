@@ -159,7 +159,14 @@ void PollManager::run()
                                 Handler* handler = new Handler(request, _configParser);
                                 _handlers[pfd.fd] = handler;
                                 
+                                // Process the request to generate the response
+                                handler->process();
                                 std::string response = handler->getResponse();
+                                
+                                write(1, "[DEBUG] Taille de la réponse: ", 30);
+                                char size_buf[32];
+                                snprintf(size_buf, sizeof(size_buf), "%zu\n", response.length());
+                                write(1, size_buf, strlen(size_buf));
                                 
                                 int sent = send(pfd.fd, response.c_str(), response.length(), 0);
                                 if (sent < 0) {
@@ -167,6 +174,10 @@ void PollManager::run()
                                     to_remove.push_back(pfd.fd);
                                 } else {
                                     write(1, "[DEBUG] Réponse envoyée avec succès\n", 39);
+                                    write(1, "[DEBUG] Nombre d'octets envoyés: ", 35);
+                                    char sent_buf[32];
+                                    snprintf(sent_buf, sizeof(sent_buf), "%d\n", sent);
+                                    write(1, sent_buf, strlen(sent_buf));
                                     
                                     std::string connection = request.getHeader("Connection");
                                     if (connection == "keep-alive") {

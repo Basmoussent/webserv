@@ -1,2 +1,1 @@
-si ona s une liste d'index essaier de les renvoyer 1 par 1 jusqua que 1 marche bien
-recupere les requete par chunk aussi
+patch les cgi au cas ou le script fail ou alors si on as une boucle infini

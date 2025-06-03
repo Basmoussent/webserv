@@ -179,11 +179,17 @@
     </div>
 
     <script>
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         function showResponse(elementId, response, isError = false) {
             const responseElement = document.getElementById(elementId);
             responseElement.style.display = 'block';
             responseElement.className = 'response-section ' + (isError ? 'error' : 'success');
-            responseElement.innerHTML = '<pre>' + response + '</pre>';
+            responseElement.innerHTML = '<pre>' + escapeHtml(response) + '</pre>';
         }
 
         document.getElementById('sendForm').addEventListener('submit', function(e) {

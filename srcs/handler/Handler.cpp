@@ -40,6 +40,10 @@ Request& Handler::getRequest()
 
 void Handler::process()
 {
+    std::cout << "[DEBUG] Début du traitement de la requête" << std::endl;
+    std::cout << "[DEBUG] Méthode: " << _request.getMethod() << std::endl;
+    std::cout << "[DEBUG] URI: " << _request.getUri() << std::endl;
+    
 	if (_request.isValid())
 	{
         size_t i = 0;
@@ -47,6 +51,7 @@ void Handler::process()
 
         if (_configParser.getServers().empty() || _configParser.getServers()[0].locations.empty())
         {
+            std::cout << "[DEBUG] Aucun serveur ou location configuré" << std::endl;
             setStatusCode(500);
             _response = buildResponse(500, "Internal Server Error", "text/plain");
             return;
@@ -345,7 +350,12 @@ void Handler::handleCGI()
             setStatusCode(200);
             std::ostringstream len;
             len << output.size();
-            _response = buildResponse(200, output, "text/plain");
+            if (output.find("<!DOCTYPE html>") != std::string::npos || 
+                output.find("<html>") != std::string::npos) {
+                _response = buildResponse(200, output, "text/plain");
+            } else {
+                _response = buildResponse(200, output, "text/plain");
+            }
         } else {
             setStatusCode(500);
             _response = buildResponse(500, "Internal Server Error", "text/plain");
