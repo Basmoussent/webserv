@@ -17,7 +17,6 @@ ConfigParser::ConfigParser()
 	_keywords["cgi"] = 0;
 	_keywords["cgi_path"] = 0;
 	_keywords["cgi_ext"] = 0;
-	_keywords["upload_dir"] = 0;
 	_keywords["return"] = 0;
 }
 

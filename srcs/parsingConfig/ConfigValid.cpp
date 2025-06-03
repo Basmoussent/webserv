@@ -66,7 +66,7 @@ bool ConfigParser::isValueValid(const std::string& key, const std::string& value
 	if (key == "index")
 		return isValidIndex(value, loc, srv);
 
-	if (key == "cgi_path" || key == "upload_dir")
+	if (key == "cgi_path")
 		return isValidPath(value, loc, srv, "root");
 
 	if (key == "return")
@@ -167,10 +167,10 @@ bool ConfigParser::isValidRoot(const std::string& path) const
 	return false;
 }
 
-bool	ConfigParser::isValidPath(const std::string& path, const Location& loc, const Server& srv, const std::string& key) const
+bool ConfigParser::isValidPath(const std::string& path, const Location& loc, const Server& srv, const std::string& key) const
 {
-	if (path[0] == '.' || path[0] == '/')
-		return (access(path.c_str(), F_OK) == 0);
+	std::istringstream iss(path);
+	std::string token;
 
 	std::map<std::string, std::string>::const_iterator it = loc.instruct.find(key);
 	std::string root;
@@ -180,13 +180,23 @@ bool	ConfigParser::isValidPath(const std::string& path, const Location& loc, con
 	if (it != srv.instruct.end() && root.empty())
 		root = it->second;
 
-	std::string fullPath = root;
-	if (!fullPath.empty() && fullPath[fullPath.size() - 1] != '/')
-		fullPath += "/";
-	fullPath += path;
-	if (access(fullPath.c_str(), F_OK) == 0)
-		return true;
-	return false;
+	while (iss >> token) {
+		std::string checkPath;
+
+		if (token[0] == '.' || token[0] == '/') {
+			checkPath = token;
+		} else {
+			checkPath = root;
+			if (!checkPath.empty() && checkPath[checkPath.size() - 1] != '/')
+				checkPath += "/";
+			checkPath += token;
+		}
+
+		if (access(checkPath.c_str(), F_OK) != 0)
+			return false;
+	}
+
+	return true;
 }
 
 bool ConfigParser::isValidErrorPage(const std::string& val, const Location& loc, const Server& srv) const
