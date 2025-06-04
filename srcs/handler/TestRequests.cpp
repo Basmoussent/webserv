@@ -38,7 +38,7 @@ void runTests(ConfigParser& parser) {
     //               "Hello, this is the content of the uploaded file.\r\n"
     //               "------WebKitFormBoundary7MA4YWxkTrZu0gW--\r\n";
     
-    // requests[4] = "GET /cgi-bin/time.py HTTP/1.1\r\n"
+    // requests[4] = "GET /cgi-bin/time.pl HTTP/1.1\r\n"
     //               "Host: 127.0.0.1:8002\r\n"
     //               "\r\n\r\n";
     

@@ -344,7 +344,7 @@ class WebservTester:
             return
         
         try:
-            cgi_url = f"{self.base_url}{cgi_location}/hello.py"
+            cgi_url = f"{self.base_url}{cgi_location}/hello.pl"
             print(f"Testing CGI execution at: {cgi_url}")
             response = requests.get(cgi_url , timeout=10)
             
@@ -739,7 +739,7 @@ class WebservTester:
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python3 webserv_tester.py <config_file> [webserv_binary]")
+        print("Usage: python3 webserv_tester.pl <config_file> [webserv_binary]")
         sys.exit(1)
     
     config_file = sys.argv[1]

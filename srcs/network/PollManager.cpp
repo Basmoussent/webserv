@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   PollManager.cpp                                    :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: bdenfir <bdenfir@student.42.fr>            +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/06/04 17:08:25 by bdenfir           #+#    #+#             */
+/*   Updated: 2025/06/04 17:24:57 by bdenfir          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "Webserv.hpp"
 #include <unistd.h>
 #include <sys/socket.h>
@@ -7,7 +19,7 @@
 #include <netinet/in.h>  // Pour sockaddr_in
 
 // Helper pour mettre un fd en non-bloquant
-static void setNonBlocking(int fd) {
+void setNonBlocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags >= 0) {
         fcntl(fd, F_SETFL, flags | O_NONBLOCK);
@@ -35,6 +47,7 @@ PollManager::~PollManager() {
 
 void PollManager::cleanupHandlers() {
     for (std::map<int, Handler*>::iterator it = _handlers.begin(); it != _handlers.end(); ++it) {
+        std::cout << "[DEBUG] Nettoyage du Handler pour le FD " << it->first << std::endl;
         delete it->second;
     }
     _handlers.clear();
@@ -81,7 +94,7 @@ void PollManager::run()
         std::vector<int> to_remove;
 
         for (int idx = static_cast<int>(_pollfds.size()) - 1; idx >= 0; --idx) {
-            struct pollfd& pfd = _pollfds[idx];
+            struct pollfd pfd = _pollfds[idx];
 
             if (pfd.revents & (POLLHUP | POLLERR | POLLNVAL)) {
                 write(1, "[DEBUG] Erreur ou déconnexion détectée\n", 40);
@@ -157,6 +170,9 @@ void PollManager::run()
                                 write(1, "[DEBUG] Requête valide, création du Handler\n", 45);
                                 
                                 Handler* handler = new Handler(request, _configParser);
+                                if (_handlers[pfd.fd]) {
+                                    delete _handlers[pfd.fd];
+                                }
                                 _handlers[pfd.fd] = handler;
                                 
                                 // Process the request to generate the response
@@ -175,6 +191,7 @@ void PollManager::run()
                                 } else {
                                     write(1, "[DEBUG] Réponse envoyée avec succès\n", 39);
                                     write(1, "[DEBUG] Nombre d'octets envoyés: ", 35);
+                                    std::cout << "[DEBUG] Status Code: "<<handler->getStatusCode() << std::endl;
                                     char sent_buf[32];
                                     snprintf(sent_buf, sizeof(sent_buf), "%d\n", sent);
                                     write(1, sent_buf, strlen(sent_buf));

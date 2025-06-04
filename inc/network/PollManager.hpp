@@ -27,3 +27,5 @@ private:
     
     void cleanupHandlers();
 };
+
+ void setNonBlocking(int fd);
