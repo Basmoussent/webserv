@@ -1,0 +1,11 @@
+=== POST Request Log ===
+Timestamp: /post_20250530_165109.log
+Path: /test
+Content-Type: application/json
+Content-Length: 52
+=== Body ===
+{
+  "username": "alice",
+  "password": "qwe"
+}
+=== End of Log ===

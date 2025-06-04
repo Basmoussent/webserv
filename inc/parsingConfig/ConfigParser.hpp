@@ -33,7 +33,6 @@ class ConfigParser
 		bool		assignKeyValue(const std::string& key, std::istringstream& iss);
 		
 		bool		checkMinimumConfig() const;
-		bool		WhatIsYourName(const std::string& name, const std::string& val) const;
 		std::string	trim(const std::string& s);
 
 		// Validation methods
@@ -44,12 +43,10 @@ class ConfigParser
 		bool		isValidIP(const std::string& ip) const;
 		bool		isValidMethods(const std::string& val) const;
 		bool		isValidExtension(const std::string& s) const;
-		bool		isValidRoot(const std::string& path) const;
+		bool		isValidRelativPath(const std::string& path) const ;
 		bool		isValidPath(const std::string& path, const Location& loc, const Server& srv, const std::string& key) const;
 		bool		isValidErrorPage(const std::string& val, const Location& loc, const Server& srv) const;
 		bool		isValidIndex(const std::string& val, const Location& loc, const Server& srv) const;
-		bool		isValidCgi(const std::string& path, const Location& loc, const Server& srv) const;
-		bool		isValidUpload(const std::string& path, const Location& loc, const Server& srv) const;
 		bool		isValidRedirect(const std::string& val, const Location& loc, const Server& srv) const;
 
 	public :

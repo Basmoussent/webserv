@@ -22,7 +22,7 @@ ConfigParser::ConfigParser()
 
 ConfigParser::~ConfigParser() {}
 
-bool ConfigParser::parseFile(const std::string& filename)
+bool	ConfigParser::parseFile(const std::string& filename)
 {
 	std::ifstream file;
 	if (!openFile(filename, file))
@@ -60,27 +60,27 @@ bool ConfigParser::parseFile(const std::string& filename)
 	return true;
 }
 
-bool ConfigParser::openFile(const std::string& filename, std::ifstream& file)
+bool	ConfigParser::openFile(const std::string& filename, std::ifstream& file)
 {
 	file.open(filename.c_str());
 	return file.is_open();
 }
 
-bool ConfigParser::parseLine(const std::string& line)
+bool	ConfigParser::parseLine(const std::string& line)
 {
 	std::istringstream iss(line);
 	std::string word;
 	iss >> word;
 
-	if (word == "server") {
+	if (word == "server")
+	{
 		iss >> word;
 		if (word == "{") 
 			_inServer = true;
 		return handleServerBlock();
 	}
-	else if (word == "location") {
+	else if (word == "location")
 		return handleLocationBlock(iss);
-	}
 	else if (word == "}")
 		return handleClosingBrace();
 	else if (word == "{")
@@ -109,7 +109,7 @@ bool ConfigParser::parseLine(const std::string& line)
 }
 
 
-bool ConfigParser::handleServerBlock()
+bool	ConfigParser::handleServerBlock()
 {
 	if (_blockDepth != 0)
 	{
@@ -121,7 +121,7 @@ bool ConfigParser::handleServerBlock()
 	return true;
 }
 
-bool ConfigParser::handleLocationBlock(std::istringstream& iss)
+bool	ConfigParser::handleLocationBlock(std::istringstream& iss)
 {
 	if (_blockDepth != 1)
 	{
@@ -130,6 +130,11 @@ bool ConfigParser::handleLocationBlock(std::istringstream& iss)
 	}
 	std::string path;
 	iss >> path;
+	if (!isValidRelativPath(path)) 
+	{
+		std::cerr << "Error: invalid location path." << std::endl;
+		return false;
+	}
 	_currentLocation = Location();
 	_currentLocation.path = path;
 	iss >> path;
@@ -139,7 +144,7 @@ bool ConfigParser::handleLocationBlock(std::istringstream& iss)
 	return true;
 }
 
-bool ConfigParser::handleClosingBrace()
+bool	ConfigParser::handleClosingBrace()
 {
 	if (_blockDepth == 2)
 	{
@@ -173,7 +178,7 @@ bool ConfigParser::handleClosingBrace()
 	return true;
 }
 
-bool ConfigParser::checkMinimumConfig() const
+bool	ConfigParser::checkMinimumConfig() const
 {
 	for (size_t s = 0; s < _servers.size(); ++s)
 	{
@@ -182,7 +187,23 @@ bool ConfigParser::checkMinimumConfig() const
 		{
 			if (it->second == 1)
 			{
-				if (srv.instruct.find(it->first) == srv.instruct.end())
+				if (it->first == "listen")
+				{
+					std::map<std::string, std::string>::const_iterator hostIt = srv.instruct.find("host");
+					bool hostHasPort = false;
+					if (hostIt != srv.instruct.end())
+					{
+						const std::string& hostVal = hostIt->second;
+						if (hostVal.find(':') != std::string::npos)
+							hostHasPort = true;
+					}
+					if (srv.instruct.find("listen") == srv.instruct.end() && !hostHasPort)
+					{
+						std::cerr << "Error: missing required directive 'listen' in server block " << s + 1 << "." << std::endl;
+						return false;
+					}
+				}
+				else if (srv.instruct.find(it->first) == srv.instruct.end())
 				{
 					std::cerr << "Error: missing required directive '" << it->first << "' in server block " << s + 1 << "." << std::endl;
 					return false;
@@ -193,7 +214,7 @@ bool ConfigParser::checkMinimumConfig() const
 	return true;
 }
 
-bool ConfigParser::assignKeyValue(const std::string& key, std::istringstream& iss)
+bool	ConfigParser::assignKeyValue(const std::string& key, std::istringstream& iss)
 {
 	std::string value, word;
 	while (iss >> word)

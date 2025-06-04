@@ -57,8 +57,8 @@ bool ConfigParser::isValueValid(const std::string& key, const std::string& value
 	if (key == "cgi_ext")
 		return isValidExtension(value);
 	
-	if (key == "root")
-		return isValidRoot(value);
+	if (key == "root" || key == "cgi_path")
+		return isValidRelativPath(value);
 
 	if (key == "error_page")
 		return isValidErrorPage(value, loc, srv);
@@ -119,30 +119,36 @@ bool ConfigParser::isValidPort(const std::string& s) const
 {
 	if (!isInteger(s))
 		return false;
-	int port;
-
-	port = atoi(s.c_str());
-	if (port >= 0 && port <= 65535)
+	int port = atoi(s.c_str());
+	if (port >= 1025 && port <= 65535)
 		return true;
 	return false;
 }
 
-bool ConfigParser::isValidIP(const std::string& ip) const
+bool ConfigParser::isValidIP(const std::string& host) const
 {
+	std::string ip = host;
+	std::string portStr;
+	size_t colon = host.find(':');
+	if (colon != std::string::npos)
+	{
+		ip = host.substr(0, colon);
+		portStr = host.substr(colon + 1);
+		if (!isValidPort(portStr))
+			return false;
+	}
+
 	std::istringstream iss(ip);
 	std::string token;
 	int count = 0;
-
 	while (std::getline(iss, token, '.'))
 	{
 		if (!isInteger(token))
 			return false;
-		int num;
-
-		num = atoi(token.c_str());
+		int num = atoi(token.c_str());
 		if (num < 0 || num > 255)
 			return false;
-		count++;	
+		count++;
 	}
 	return count == 4;
 }
@@ -160,7 +166,7 @@ bool ConfigParser::isValidMethods(const std::string& val) const
 	return true;
 }
 
-bool ConfigParser::isValidRoot(const std::string& path) const
+bool ConfigParser::isValidRelativPath(const std::string& path) const
 {
 	if (access(path.c_str(), F_OK) == 0)
 		return true;
@@ -209,6 +215,7 @@ bool ConfigParser::isValidErrorPage(const std::string& val, const Location& loc,
 	if (!isInteger(code))
 		return false;
 	int nb = atoi(code.c_str());
+	if (nb < 400 || nb >= 600)
 	if (nb < 400 || nb >= 600)
 		return false;
 	return (isValidPath(path, loc, srv, "root"));

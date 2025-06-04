@@ -40,9 +40,10 @@ std::string ConfigParser::trim(const std::string& s)
 
 void ConfigParser::printServers() const
 {
+	std::cout << "------------- CONFIGURATION -------------\n" << std::endl;
 	for (std::size_t s = 0; s < _servers.size(); ++s)
 	{
-		std::cout << "--- SERVER " << s + 1 << " ---" << std::endl;
+		std::cout << "     --- SERVER " << s + 1 << " ---" << std::endl;
 
 		std::map<std::string, std::string>::const_iterator it;
 		for (it = _servers[s].instruct.begin(); it != _servers[s].instruct.end(); ++it)
@@ -61,27 +62,6 @@ void ConfigParser::printServers() const
 				std::cout << "    " << lit->first << " : " << lit->second << std::endl;
 			}
 		}
+		std::cout << "\n-----------------------------------------\n" << std::endl;
 	}
 }
-
-//a enlever dans un autre fichier
-bool	ConfigParser::WhatIsYourName(const std::string& name, const std::string& val) const
-{
-	std::cout << "val : " << val << std::endl;
-	std::istringstream iss(val);
-	std::string next;
-
-	while (iss >> next)
-	{
-		std::cout << "next name : " << next << std::endl;
-		if (next == name)
-			return true;
-	}
-	return false;
-}
-
-// bool ConfigParser::errors(std::string& errorMessage) const
-// {
-// 	std::cout << "Error: " << errorMessage << std::endl;
-// 	return false;
-// }
