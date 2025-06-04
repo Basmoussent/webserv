@@ -80,9 +80,3 @@ void ConfigParser::printServers() const
 		std::cout << "\n-----------------------------------------\n" << std::endl;
 	}
 }
-
-// bool ConfigParser::errors(std::string& errorMessage) const
-// {
-// 	std::cout << "Error: " << errorMessage << std::endl;
-// 	return false;
-// }

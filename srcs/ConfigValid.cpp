@@ -65,9 +65,6 @@ bool ConfigParser::isValueValid(const std::string& key, const std::string& value
 	if (key == "index")
 		return isValidIndex(value, loc, srv);
 
-	if (key == "upload_dir")
-		return isValidPath(value, loc, srv, "root");
-
 	if (key == "return")
 		return isValidRedirect(value, loc, srv);
 	
@@ -93,14 +90,16 @@ bool	ConfigParser::isValidName(const std::string& val) const
 
 bool ConfigParser::isValidExtension(const std::string& s) const
 {
-	const std::string ext[] = {".py", ".sh"};
-	for (size_t i = 0; i < sizeof(ext); ++i)
-	{
-		if (s == ext[i])
-			return true;
-	}
-	return false;
+    std::istringstream iss(s);
+    std::string token;
 
+	//changer les extensions (voir avec Basem)
+    while (iss >> token) {
+        if (token != "autre extenion" && token != ".sh") {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool ConfigParser::isInteger(const std::string& s) const
@@ -118,7 +117,6 @@ bool ConfigParser::isValidPort(const std::string& s) const
 	if (!isInteger(s))
 		return false;
 	int port = atoi(s.c_str());
-
 	if (port >= 1025 && port <= 65535)
 		return true;
 	return false;
@@ -172,10 +170,10 @@ bool ConfigParser::isValidRelativPath(const std::string& path) const
 	return false;
 }
 
-bool	ConfigParser::isValidPath(const std::string& path, const Location& loc, const Server& srv, const std::string& key) const
+bool ConfigParser::isValidPath(const std::string& path, const Location& loc, const Server& srv, const std::string& key) const
 {
-	if (path[0] == '.')
-		return (access(path.c_str(), F_OK) == 0);
+	std::istringstream iss(path);
+	std::string token;
 
 	std::map<std::string, std::string>::const_iterator it = loc.instruct.find(key);
 	std::string root;
@@ -185,13 +183,24 @@ bool	ConfigParser::isValidPath(const std::string& path, const Location& loc, con
 	if (it != srv.instruct.end() && root.empty())
 		root = it->second;
 
-	std::string fullPath = root;
-	if (!fullPath.empty() && fullPath[fullPath.size() - 1] != '/')
-		fullPath += "/";
-	fullPath += path;
-	if (access(fullPath.c_str(), F_OK) == 0)
-		return true;
-	return false;
+	while (iss >> token) {
+		std::string checkPath;
+
+		if (token[0] == '.' || token[0] == '/')
+		{
+			checkPath = token;
+		} else
+		{
+			checkPath = root;
+			if (!checkPath.empty() && checkPath[checkPath.size() - 1] != '/')
+				checkPath += "/";
+			checkPath += token;
+		}
+
+		if (access(checkPath.c_str(), F_OK) != 0)
+			return false;
+	}
+	return true;
 }
 
 bool ConfigParser::isValidErrorPage(const std::string& val, const Location& loc, const Server& srv) const
@@ -204,7 +213,7 @@ bool ConfigParser::isValidErrorPage(const std::string& val, const Location& loc,
 	if (!isInteger(code))
 		return false;
 	int nb = atoi(code.c_str());
-	if (nb < 400 && nb >= 600)
+	if (nb < 400 || nb >= 600)
 		return false;
 	return (isValidPath(path, loc, srv, "root"));
 }

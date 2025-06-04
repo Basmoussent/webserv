@@ -45,7 +45,6 @@ class ConfigParser
 		
 		bool		checkMinimumConfig() const;
 		bool		WhatIsYourName(const std::string& name, const std::string& val) const;
-		// bool		errors(std::string& errorMessage) const;
 		std::string	trim(const std::string& s);
 
 

@@ -16,7 +16,6 @@ ConfigParser::ConfigParser()
 	_keywords["cgi"] = 0;
 	_keywords["cgi_path"] = 0;
 	_keywords["cgi_ext"] = 0;
-	_keywords["upload_dir"] = 0;
 	_keywords["return"] = 0;
 }
 
@@ -72,15 +71,15 @@ bool	ConfigParser::parseLine(const std::string& line)
 	std::string word;
 	iss >> word;
 
-	if (word == "server") {
+	if (word == "server")
+	{
 		iss >> word;
 		if (word == "{") 
 			_inServer = true;
 		return handleServerBlock();
 	}
-	else if (word == "location") {
+	else if (word == "location")
 		return handleLocationBlock(iss);
-	}
 	else if (word == "}")
 		return handleClosingBrace();
 	else if (word == "{")
@@ -130,6 +129,11 @@ bool	ConfigParser::handleLocationBlock(std::istringstream& iss)
 	}
 	std::string path;
 	iss >> path;
+	if (!isValidRelativPath(path)) 
+	{
+		std::cerr << "Error: invalid location path." << std::endl;
+		return false;
+	}
 	_currentLocation = Location();
 	_currentLocation.path = path;
 	iss >> path;
