@@ -142,11 +142,7 @@ bool	ConfigParser::handleLocationBlock(std::istringstream& iss)
 	}
 	std::string path;
 	iss >> path;
-	if (!isValidRelativPath(path)) 
-	{
-		std::cerr << "Error: invalid location path." << std::endl;
-		return false;
-	}
+	
 	_currentLocation = Location();
 	_currentLocation.path = path;
 	iss >> path;

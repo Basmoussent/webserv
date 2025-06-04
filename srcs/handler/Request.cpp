@@ -58,21 +58,34 @@ void Request::feed(const char* buffer, size_t bytes_read)
 		return;
 		
 	_rawRequest.append(buffer, bytes_read);
-	if (!_headersParsed)
-	{
-		size_t pos = _rawRequest.find("\r\n\r\n");
-		if (pos != std::string::npos)
-		{
-			std::string headers_section = _rawRequest.substr(0, pos + 2);
+	
+	// Si les headers n'ont pas encore été parsés, essayer de les parser
+	if (!_headersParsed) {
+		size_t header_end = _rawRequest.find("\r\n\r\n");
+		if (header_end != std::string::npos) {
+			std::string headers_section = _rawRequest.substr(0, header_end);
 			parseHeaders(headers_section);
 			_headersParsed = true;
-			_rawRequest.erase(0, pos + 4);
+			
+			// Extraire le corps de la requête
+			_body = _rawRequest.substr(header_end + 4);
+			_rawRequest.clear();
+			
+			// Mettre à jour la longueur du contenu
+			std::map<std::string, std::string>::const_iterator it = _headers.find("Content-Length");
+			if (it != _headers.end()) {
+				_contentLength = static_cast<size_t>(atoi(it->second.c_str()));
+			}
+
+			// Valider la requête après avoir parsé les headers
+			if (!_method.empty() && !_headers.empty() && _headers.find("Host") != _headers.end()) {
+				_isValid = true;
+			}
 		}
-	}
-	if (_headersParsed && !_isValid)
-	{
-		std::istringstream stream(_rawRequest);
-		parseBody(stream, _body);		
+	} else {
+		// Si les headers sont déjà parsés, ajouter au corps
+		_body += _rawRequest;
+		_rawRequest.clear();
 	}
 }
 
@@ -113,22 +126,16 @@ void Request::setHeader(const std::string key, const std::string value)
 
 void Request::setBody(const std::string& body)
 {
-	if (_method == "DELETE") {
-		size_t start = body.find_first_not_of(" \t\r\n");
-		size_t end = body.find_last_not_of(" \t\r\n");
-		if (start != std::string::npos && end != std::string::npos)
-			_body = body.substr(start, end - start + 1);
-		else
-			_body = body;
-	} else if (_method == "POST" && _multiform) {
+	if (_method == "POST" && _multiform) {
 		_body += body;
 	} else {
-		size_t start = body.find_first_not_of(" \t\r");
-		size_t end = body.find_last_not_of(" \t\r");
-		if (start != std::string::npos && end != std::string::npos)
-			_body += body.substr(start, end - start + 1);
-		else
-			_body += body;
+		size_t start = body.find_first_not_of(" \t\r\n");
+		size_t end = body.find_last_not_of(" \t\r\n");
+		if (start != std::string::npos && end != std::string::npos) {
+			_body = body.substr(start, end - start + 1);
+		} else {
+			_body = body;
+		}
 	}
 }
 
@@ -212,9 +219,10 @@ void Request::parseRequest(const std::string raw_request)
 	}
 	parseHeaders(headers_section);
 	parseBody(request_stream, body_section);
-	if (!_chunked && getHeader("Host").empty())
+	if (!_chunked && getHeader("Host").empty() && _multiform && _method != "POST")
 	{
 		std::cout << "Missing Host header in request" << std::endl;
+		std::cout << _multiform << std::endl;
 		setValid(false);	
 	}
 }
@@ -251,10 +259,19 @@ void Request::parseBody(std::istringstream &request_stream, std::string &body_se
             std::cout << "Read chunk content: [" << chunk << "]" << std::endl;
             body_section += chunk;
         }
+    } else if (_multiform) {
+        // Pour les requêtes multipart, on lit tout le corps
+        std::string line;
+        while (std::getline(request_stream, line)) {
+            if (!body_section.empty()) {
+                body_section += "\n";
+            }
+            body_section += line;
+        }
     } else {
         std::string line;
         bool isFirstLine = true;
-		std::cout << "Parsing body without chunked encoding" << std::endl;
+        std::cout << "Parsing body without chunked encoding" << std::endl;
         
         while (std::getline(request_stream, line)) {
             if (isFirstLine && line.empty()) {
@@ -270,16 +287,16 @@ void Request::parseBody(std::istringstream &request_stream, std::string &body_se
     }
     setBody(body_section);
 
-	if (body_section.empty()) {
-		_contentLength = 0;
-	} else {
-		std::map<std::string, std::string>::const_iterator it = _headers.find("Content-Length");
-		if (it != _headers.end()) {
-			_contentLength = static_cast<size_t>(atoi(it->second.c_str()));
-		} else {
-			_contentLength = body_section.length();
-		}
-	}
+    if (body_section.empty()) {
+        _contentLength = 0;
+    } else {
+        std::map<std::string, std::string>::const_iterator it = _headers.find("Content-Length");
+        if (it != _headers.end()) {
+            _contentLength = static_cast<size_t>(atoi(it->second.c_str()));
+        } else {
+            _contentLength = body_section.length();
+        }
+    }
 }
 
 void Request::parseRequestLine(const std::string request_line)
@@ -332,13 +349,14 @@ void Request::parseHeaders(std::string header)
                 std::size_t boundary_pos = value.find("boundary=");
                 if (boundary_pos != std::string::npos)
                 {
-                    _boundary = value.substr(boundary_pos + 9);
+					std::cout << "Boundary found: " << value.substr(boundary_pos + 9) << std::endl;
+					_boundary = value.substr(boundary_pos + 9);
                     _multiform = true;
+					std::cout << "Multiform: " << _multiform << std::endl;
                 }
             }
             else if (key == "Transfer-Encoding" && value.find("chunked") != std::string::npos) {
                 _chunked = true;
-                std::cout << "Found chunked transfer encoding" << std::endl;
             }
             setHeader(key, value);
         }
@@ -426,3 +444,74 @@ void Request::clear() {
 
 // check request type
 // Verifier le HOST car obligatoire
+
+std::string Request::extractContentFromMultipart(const std::string& body, const std::string& boundary) const {
+    std::string content;
+    
+    if (boundary.empty() || body.empty()) {
+        return content;
+    }
+
+    // Trouver le début du contenu
+    size_t start = body.find("\r\n\r\n");
+    if (start == std::string::npos) {
+        return content;
+    }
+    start += 4; // Passer après \r\n\r\n
+    
+    // Trouver la fin du contenu
+    std::string endBoundary = "--" + boundary + "--";
+    size_t end = body.find(endBoundary, start);
+    if (end == std::string::npos) {
+        end = body.find("--" + boundary, start);
+        if (end == std::string::npos) {
+            return content;
+        }
+    }
+    
+    // Extraire le contenu
+    content = body.substr(start, end - start);
+    
+    // Nettoyer le contenu des retours à la ligne finaux
+    while (!content.empty() && (content[content.length() - 1] == '\r' || content[content.length() - 1] == '\n')) {
+        content.erase(content.length() - 1);
+    }
+    
+    return content;
+}
+
+std::string Request::extractFilenameFromMultipart(const std::string& body, const std::string& boundary) const {
+    std::string filename;
+    
+    if (boundary.empty() || body.empty()) {
+        return filename;
+    }
+
+    // Trouver le début du boundary
+    size_t start = body.find("--" + boundary);
+    if (start == std::string::npos) {
+        return filename;
+    }
+    
+    // Chercher le nom du fichier
+    size_t pos = body.find("filename=\"", start);
+    if (pos == std::string::npos) {
+        return filename;
+    }
+    
+    pos += 10; // Passer après filename="
+    size_t end = body.find("\"", pos);
+    if (end == std::string::npos) {
+        return filename;
+    }
+    
+    filename = body.substr(pos, end - pos);
+    
+    // Nettoyer le nom du fichier
+    size_t lastSlash = filename.find_last_of("/\\");
+    if (lastSlash != std::string::npos) {
+        filename = filename.substr(lastSlash + 1);
+    }
+    
+    return filename;
+}

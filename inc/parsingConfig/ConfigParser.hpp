@@ -45,6 +45,7 @@ class ConfigParser
 		bool		isValidExtension(const std::string& s) const;
 		bool		isValidRelativPath(const std::string& path) const ;
 		bool		isValidPath(const std::string& path, const Location& loc, const Server& srv, const std::string& key) const;
+		bool		isValidCGIPath(const std::string& path) const;
 		bool		isValidErrorPage(const std::string& val, const Location& loc, const Server& srv) const;
 		bool		isValidIndex(const std::string& val, const Location& loc, const Server& srv) const;
 		bool		isValidRedirect(const std::string& val, const Location& loc, const Server& srv) const;

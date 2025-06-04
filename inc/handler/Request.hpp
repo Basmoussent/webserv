@@ -67,6 +67,10 @@ public:
     
     void clear();
     // bool validateRequest() const;
+    
+    // Fonctions pour le traitement des requêtes multipart/form-data
+    std::string extractContentFromMultipart(const std::string& body, const std::string& boundary) const;
+    std::string extractFilenameFromMultipart(const std::string& body, const std::string& boundary) const;
 };
 
 std::ostream& operator<<(std::ostream& os, const Request& request);

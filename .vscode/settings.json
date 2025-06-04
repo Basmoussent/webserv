@@ -52,7 +52,8 @@
     "typeinfo": "cpp",
     "codecvt": "cpp",
     "csignal": "cpp",
-    "ratio": "cpp"
+    "ratio": "cpp",
+    "*.tcc": "cpp"
   },
   "C_Cpp_Runner.cCompilerPath": "gcc",
   "C_Cpp_Runner.cppCompilerPath": "g++",

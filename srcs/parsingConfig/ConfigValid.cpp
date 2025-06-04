@@ -57,7 +57,7 @@ bool ConfigParser::isValueValid(const std::string& key, const std::string& value
 	if (key == "cgi_ext")
 		return isValidExtension(value);
 	
-	if (key == "root" || key == "cgi_path")
+	if (key == "root")
 		return isValidRelativPath(value);
 
 	if (key == "error_page")
@@ -67,7 +67,7 @@ bool ConfigParser::isValueValid(const std::string& key, const std::string& value
 		return isValidIndex(value, loc, srv);
 
 	if (key == "cgi_path")
-		return isValidPath(value, loc, srv, "root");
+		return isValidCGIPath(value);
 
 	if (key == "return")
 		return isValidRedirect(value, loc, srv);
@@ -173,36 +173,57 @@ bool ConfigParser::isValidRelativPath(const std::string& path) const
 	return false;
 }
 
+bool ConfigParser::isValidCGIPath(const std::string& path) const
+{
+    std::istringstream iss(path);
+    std::string token;
+
+    while (iss >> token) {
+        if (token[0] == '.' || token[0] == '/') {
+			if (access(token.c_str(), F_OK) != 0) {
+				std::cerr << "Error: CGI path '" << token << "' does not exist." << std::endl;
+				return false;
+			}
+		} else {
+			std::cerr << "Error: CGI path '" << token << "' must be an absolute path." << std::endl;
+			return false;
+		}
+    }
+    return true;
+}
+
 bool ConfigParser::isValidPath(const std::string& path, const Location& loc, const Server& srv, const std::string& key) const
 {
-	std::istringstream iss(path);
-	std::string token;
+    std::istringstream iss(path);
+    std::string token;
 
-	std::map<std::string, std::string>::const_iterator it = loc.instruct.find(key);
-	std::string root;
-	if (it != loc.instruct.end())
-		root = it->second;
-	it = srv.instruct.find(key);
-	if (it != srv.instruct.end() && root.empty())
-		root = it->second;
+    std::map<std::string, std::string>::const_iterator it = loc.instruct.find(key);
+    std::string root;
+    if (it != loc.instruct.end())
+        root = it->second;
+    it = srv.instruct.find(key);
+    if (it != srv.instruct.end() && root.empty())
+        root = it->second;
 
-	while (iss >> token) {
-		std::string checkPath;
+    while (iss >> token) {
+        std::string checkPath;
 
-		if (token[0] == '.' || token[0] == '/') {
-			checkPath = token;
-		} else {
-			checkPath = root;
-			if (!checkPath.empty() && checkPath[checkPath.size() - 1] != '/')
-				checkPath += "/";
-			checkPath += token;
-		}
+        if (token[0] == '.' || token[0] == '/') {
+            checkPath = token;
+        } else {
+            checkPath = root;
+            if (!checkPath.empty() && checkPath[checkPath.size() - 1] != '/')
+                checkPath += "/";
+            checkPath += token;
+        }
+        if (access(checkPath.c_str(), F_OK) != 0)
+        {
+            std::cerr << "Error: path '" << checkPath << "' does not exist." << std::endl;
+            return false;
+        }
+    }
 
-		if (access(checkPath.c_str(), F_OK) != 0)
-			return false;
-	}
-
-	return true;
+    return true;
 }
 
 bool ConfigParser::isValidErrorPage(const std::string& val, const Location& loc, const Server& srv) const
@@ -215,7 +236,6 @@ bool ConfigParser::isValidErrorPage(const std::string& val, const Location& loc,
 	if (!isInteger(code))
 		return false;
 	int nb = atoi(code.c_str());
-	if (nb < 400 || nb >= 600)
 	if (nb < 400 || nb >= 600)
 		return false;
 	return (isValidPath(path, loc, srv, "root"));
