@@ -1,4 +1,5 @@
 #include "Webserv.hpp"
+#include <sys/stat.h>
 
 
 ConfigParser::ConfigParser()
@@ -28,6 +29,17 @@ bool	ConfigParser::parseFile(const std::string& filename)
 	if (!openFile(filename, file))
 	{
 		std::cerr << "Error: unable to open file." << std::endl;
+		return false;
+	}
+	struct stat sb;
+	if (stat(filename.c_str(), &sb) == -1)
+	{
+		std::cerr << "Error: unable to get file status." << std::endl;
+		return false;
+	}
+	if (!S_ISREG(sb.st_mode))
+	{
+		std::cerr << "Error: conf file is not a regular file." << std::endl;
 		return false;
 	}
 
