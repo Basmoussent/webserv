@@ -47,10 +47,6 @@ int SocketHandler::createSocket(int port, const std::string& host) {
 
     // 4) bind()
     if (bind(sockfd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "bind(%s:%d) failed: %s\n",
-                 host.c_str(), port, strerror(errno));
-        write(2, buf, strlen(buf));
         close(sockfd);
         return -1;
     }

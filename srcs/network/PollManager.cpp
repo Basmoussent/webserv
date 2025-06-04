@@ -6,7 +6,7 @@
 /*   By: bdenfir <bdenfir@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/04 17:08:25 by bdenfir           #+#    #+#             */
-/*   Updated: 2025/06/04 17:24:57 by bdenfir          ###   ########.fr       */
+/*   Updated: 2025/06/04 18:50:12 by bdenfir          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -139,7 +139,7 @@ void PollManager::run()
                     // Données à lire sur un client existant
                     write(1, "[DEBUG] Données dispo sur socket client\n", 41);
 
-                    char buffer[1024];
+                    char buffer[4096];
                     int bytes = recv(pfd.fd, buffer, sizeof(buffer) - 1, 0);
                     if (bytes <= 0) {
                         write(1, "[DEBUG] Fermeture du client détectée\n", 38);
@@ -179,11 +179,6 @@ void PollManager::run()
                                 handler->process();
                                 std::string response = handler->getResponse();
                                 
-                                write(1, "[DEBUG] Taille de la réponse: ", 30);
-                                char size_buf[32];
-                                snprintf(size_buf, sizeof(size_buf), "%zu\n", response.length());
-                                write(1, size_buf, strlen(size_buf));
-                                
                                 int sent = send(pfd.fd, response.c_str(), response.length(), 0);
                                 if (sent < 0) {
                                     write(2, "[ERROR] Envoi de la réponse échoué\n", 36);
@@ -192,9 +187,6 @@ void PollManager::run()
                                     write(1, "[DEBUG] Réponse envoyée avec succès\n", 39);
                                     write(1, "[DEBUG] Nombre d'octets envoyés: ", 35);
                                     std::cout << "[DEBUG] Status Code: "<<handler->getStatusCode() << std::endl;
-                                    char sent_buf[32];
-                                    snprintf(sent_buf, sizeof(sent_buf), "%d\n", sent);
-                                    write(1, sent_buf, strlen(sent_buf));
                                     
                                     std::string connection = request.getHeader("Connection");
                                     if (connection == "keep-alive") {
@@ -257,9 +249,6 @@ void PollManager::addToPoll(int fd, short events) {
     newfd.events  = events;
     newfd.revents = 0;
     _pollfds.push_back(newfd);
-    char buf[64];
-    snprintf(buf, sizeof(buf), "[DEBUG] Ajout FD %d au poll\n", fd);
-    write(1, buf, strlen(buf));
 }
 
 void PollManager::removeFromPoll(int fd) {

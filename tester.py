@@ -50,7 +50,7 @@ class WebservTester:
             'port': 8002,
             'host': '127.0.0.1',
             'server_name': 'localhost',
-            'root': 'docs/fusion_web/',
+            'root': 'html',
             'index': 'index.html',
             'error_pages': {},
             'locations': {}
@@ -198,7 +198,7 @@ class WebservTester:
     
     def test_basic_http_methods(self):
         """Test des méthodes HTTP de base"""
-        methods_to_test = ['GET', 'POST', 'DELETE']
+        methods_to_test = ['GET', 'POST', 'DELETE', 'HEAD']
         
         for method in methods_to_test:
             try:
@@ -344,7 +344,7 @@ class WebservTester:
             return
         
         try:
-            cgi_url = f"{self.base_url}{cgi_location}/hello.pl"
+            cgi_url = f"{self.base_url}{cgi_location}/time.pl"
             print(f"Testing CGI execution at: {cgi_url}")
             response = requests.get(cgi_url , timeout=10)
             

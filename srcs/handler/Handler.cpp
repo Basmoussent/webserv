@@ -35,19 +35,6 @@ Handler::~Handler()
     clear();
 }
 
-Handler& Handler::operator=(const Handler& other)
-{
-    if (this != &other)
-    {
-        _request = other._request;
-        _configParser = other._configParser;
-        _response = other._response;
-        _statusCode = other._statusCode;
-        _isValid = other._isValid;
-    }
-    return *this;
-}
-
 Request& Handler::getRequest()
 {
 	return _request;
@@ -117,7 +104,11 @@ void Handler::process()
         size_t j = 0;
         for (j = 0; j < server.locations.size(); j++)
         {
-            if (server.locations[j].path == _request.getUri())
+            std::cout << "[DEBUG] Checking location: " << server.locations[j].path << std::endl;
+            std::cout << "[DEBUG] Request URI: " << _request.getUri() << std::endl;
+            if (_request.getUri().find(server.locations[j].path) == 0 && 
+                (_request.getUri().length() == server.locations[j].path.length() || 
+                 _request.getUri()[server.locations[j].path.length()] == '/'))
             {
                 std::string allowedMethods = server.locations[j].instruct["allow_methods"];
                 if (allowedMethods.find(_request.getMethod()) == std::string::npos)
@@ -357,8 +348,10 @@ void Handler::handleCGI()
         close(pipefd[0]);
 
         int status;
-        waitpid(pid, &status, WNOHANG);
-        if (WIFEXITED(status) == 0 && WEXITSTATUS(status) != 0) {
+        waitpid(pid, &status, 0);
+        std::cout << "WIFEXITED: " << WIFEXITED(status) << std::endl;
+        std::cout << "WEXISTATUS: " << WEXITSTATUS(status) << std::endl;
+        if (WIFEXITED(status) != 0 && WEXITSTATUS(status) == 0) {
             setStatusCode(200);
             std::ostringstream len;
             len << output.size();
@@ -543,7 +536,8 @@ void Handler::handleGet(Server serv, int j)
     } else {
         indexFiles.push_back("index.html");
     }
-    std::string fullPath = root + (uri[0] == '/' ? uri : "/" + uri);
+    std::string fullPath;
+    fullPath = root + (uri[0] == '/' ? uri : "/" + uri);
     std::cout << "Full path: " << fullPath << std::endl;
     fullPath = "." + normalizePath(fullPath);
     if (stat(fullPath.c_str(), &buffer) != 0) {
@@ -553,8 +547,8 @@ void Handler::handleGet(Server serv, int j)
         _response = buildResponse(404, errorPage, "text/html");
         return;
     }
-    
     if (S_ISDIR(buffer.st_mode)) {
+        std::cout << "URI is a directory: " << uri << std::endl;
         if (!uri.empty() && uri[uri.length() - 1] != '/') {
             std::string redirectUrl = "http://" + serv.instruct["host"] + ":" + serv.instruct["listen"] + uri + "/";
             std::string response = "HTTP/1.1 301 Moved Permanently\r\n";
@@ -568,7 +562,8 @@ void Handler::handleGet(Server serv, int j)
         }
         bool indexFound = false;
         for (std::vector<std::string>::iterator it = indexFiles.begin(); it != indexFiles.end(); ++it) {
-            std::string indexPath = fullPath + *it;
+            std::string indexPath = fullPath + "/" + *it;
+            std::cout << "Checking index file: " << indexPath << std::endl;
             if (stat(indexPath.c_str(), &buffer) == 0) {
                 fullPath = indexPath;
                 indexFound = true;
@@ -589,6 +584,7 @@ void Handler::handleGet(Server serv, int j)
             }
         }
     }
+    
     
     std::ifstream file(fullPath.c_str(), std::ios::binary);
     if (!file) {
@@ -867,7 +863,7 @@ void Handler::handlePost(std::string& path)
     if (file) {
         file << "=== POST Request Log ===\n";
         file << "Timestamp: " <<  tt << "\n";
-        file << "Path: " << path << "\n";
+        file << "Path: " << "/log" + path << "\n";
         file << "Content-Type: " << _request.getHeader("Content-Type") << "\n";
         file << "Content-Length: " << _request.getHeader("Content-Length") << "\n";
         file << "=== Body ===\n";
@@ -876,7 +872,7 @@ void Handler::handlePost(std::string& path)
         file.close();
         
         setStatusCode(201);
-        std::string location = "Location: " + filepath;
+        std::string location = "Location: " + filepath.substr(filepath.find_first_of("/"));
         _response = buildResponse(201, location, "text/plain");
     } else {
         setStatusCode(500);

@@ -9,83 +9,196 @@
             background-color: #f4f7f9;
             color: #333;
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            min-height: 100vh;
         }
 
         .container {
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            padding: 20px;
         }
 
         .header {
             text-align: center;
             margin-bottom: 40px;
+            grid-column: 1 / -1;
+            background: #fff;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, #3498db, #2ecc71, #e74c3c, #f1c40f);
         }
 
         .header h1 {
             color: #2c3e50;
-            font-size: 2.5em;
-            margin-bottom: 10px;
+            font-size: 2.8em;
+            margin-bottom: 15px;
+            position: relative;
+            display: inline-block;
+        }
+
+        .header h1::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 3px;
+            background: linear-gradient(90deg, #3498db, #2ecc71);
+            border-radius: 3px;
         }
 
         .header p {
             color: #7f8c8d;
-            font-size: 1.1em;
+            font-size: 1.2em;
+            margin: 20px 0 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header .server-status {
+            display: inline-flex;
+            align-items: center;
+            margin-top: 20px;
+            padding: 8px 20px;
+            background: #f8f9fa;
+            border-radius: 20px;
+            font-size: 0.9em;
+            color: #2c3e50;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .header .server-status::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #2ecc71;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.2);
+                opacity: 0.7;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .header .decoration {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: linear-gradient(45deg, rgba(52, 152, 219, 0.1), rgba(46, 204, 113, 0.1));
+            border-radius: 50%;
+            z-index: 0;
+        }
+
+        .header .decoration:nth-child(1) {
+            top: -150px;
+            right: -150px;
+        }
+
+        .header .decoration:nth-child(2) {
+            bottom: -150px;
+            left: -150px;
+            background: linear-gradient(45deg, rgba(231, 76, 60, 0.1), rgba(241, 196, 15, 0.1));
         }
 
         .form-section {
             background-color: white;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            margin-bottom: 30px;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            height: fit-content;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .form-section:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
         }
 
         .form-section h2 {
             color: #2c3e50;
             margin-top: 0;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             font-size: 1.5em;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #ecf0f1;
         }
 
         label {
             font-size: 1.1em;
             display: block;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             color: #34495e;
+            font-weight: 500;
         }
 
         input[type="text"] {
             width: 100%;
-            padding: 12px;
+            padding: 12px 15px;
             font-size: 1em;
-            border-radius: 5px;
-            border: 1px solid #bdc3c7;
-            margin-bottom: 15px;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            margin-bottom: 20px;
             box-sizing: border-box;
-            transition: border-color 0.3s ease;
+            transition: all 0.3s ease;
         }
 
         input[type="text"]:focus {
             border-color: #3498db;
             outline: none;
-            box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+            box-shadow: 0 0 8px rgba(52, 152, 219, 0.3);
         }
 
         button {
             background-color: #3498db;
             color: white;
-            padding: 12px 20px;
+            padding: 14px 20px;
             border: none;
             font-size: 1em;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
             width: 100%;
-            transition: background-color 0.3s ease;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         button:hover {
             background-color: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
         }
 
         .delete-btn {
@@ -94,6 +207,7 @@
 
         .delete-btn:hover {
             background-color: #c0392b;
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
         }
 
         .head-btn {
@@ -102,36 +216,86 @@
 
         .head-btn:hover {
             background-color: #27ae60;
+            box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
         }
 
         .response-section {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 5px;
+            margin-top: 25px;
+            padding: 20px;
+            border-radius: 8px;
             background-color: #f8f9fa;
-            display: none;
+            min-height: 120px;
+            max-height: 250px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            flex-grow: 1;
+            display: none; /* Hide by default */
         }
 
         .response-section pre {
             margin: 0;
             white-space: pre-wrap;
             word-wrap: break-word;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
         }
 
         .success {
             border-left: 4px solid #2ecc71;
+            background-color: #f0fff4;
         }
 
         .error {
             border-left: 4px solid #e74c3c;
+            background-color: #fff5f5;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                padding: 10px;
+            }
+            
+            .header {
+                padding: 30px 20px;
+            }
+            
+            .form-section {
+                padding: 20px;
+            }
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+
+        .footer span {
+            color: #e74c3c;
+            animation: heartbeat 1.5s ease-in-out infinite;
+        }
+
+        @keyframes heartbeat {
+            0% { transform: scale(1); }
+            14% { transform: scale(1.3); }
+            28% { transform: scale(1); }
+            42% { transform: scale(1.3); }
+            70% { transform: scale(1); }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
+            <div class="decoration"></div>
+            <div class="decoration"></div>
             <h1>Webserv Control Panel</h1>
             <p>Manage your files and check server status</p>
+            <div class="server-status">Server is running</div>
         </div>
 
         <div class="form-section">
@@ -169,15 +333,29 @@
             <form id="cgiForm">
                 <label for="cgiFile">CGI Script Name (in /cgi-bin/):</label>
                 <input type="text" id="cgiFile" name="cgiFile" required placeholder="e.g., test.pl">
-                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <div style="display: flex; gap: 10px;">
                     <button type="button" id="cgiGet" style="flex: 1;">Test GET</button>
                     <button type="button" id="cgiPost" style="flex: 1;">Test POST</button>
                 </div>
             </form>
             <div id="cgiResponse" class="response-section"></div>
         </div>
-    </div>
 
+        <div class="form-section">
+            <h2>Upload File</h2>
+            <form id="uploadForm">
+                <label for="fileInput">Select a file to upload:</label>
+                <input type="file" id="fileInput" name="fileInput" required>
+                <label for="uploadPath" style="margin-top: 15px;">Upload path (optional):</label>
+                <input type="text" id="uploadPath" name="uploadPath" placeholder="e.g., /uploads/">
+                <button type="submit" class="upload-btn">Upload File</button>
+            </form>
+            <div id="uploadResponse" class="response-section"></div>
+        </div>
+    </div>
+    <div class="footer">
+        Made with <span>❤</span> by 42 Students
+    </div>
     <script>
         function escapeHtml(text) {
             const div = document.createElement('div');
@@ -192,9 +370,24 @@
             responseElement.innerHTML = '<pre>' + escapeHtml(response) + '</pre>';
         }
 
+        function hideResponse(elementId) {
+            const responseElement = document.getElementById(elementId);
+            responseElement.style.display = 'none';
+        }
+
+        // Hide all response sections when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            hideResponse('sendResponse');
+            hideResponse('deleteResponse');
+            hideResponse('headResponse');
+            hideResponse('cgiResponse');
+            hideResponse('uploadResponse');
+        });
+
         document.getElementById('sendForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const textValue = document.getElementById('textInput').value;
+            showResponse('sendResponse', 'Loading...');
 
             fetch('/test', {
                 method: 'POST',
@@ -220,6 +413,7 @@
         document.getElementById('deleteForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const filePath = document.getElementById('deletePath').value;
+            showResponse('deleteResponse', 'Loading...');
 
             fetch(filePath, {
                 method: 'DELETE'
@@ -237,6 +431,7 @@
         document.getElementById('headForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const filePath = document.getElementById('headPath').value;
+            showResponse('headResponse', 'Loading...');
 
             fetch(filePath, {
                 method: 'HEAD'
@@ -257,6 +452,7 @@
                 showResponse('cgiResponse', 'Please enter a CGI script name', true);
                 return;
             }
+            showResponse('cgiResponse', 'Loading...');
 
             fetch('/cgi-bin/' + cgiFile, {
                 method: 'GET'
@@ -281,6 +477,7 @@
                 showResponse('cgiResponse', 'Please enter a CGI script name', true);
                 return;
             }
+            showResponse('cgiResponse', 'Loading...');
 
             fetch('/cgi-bin/' + cgiFile, {
                 method: 'POST',
@@ -300,6 +497,43 @@
                 }
             }).catch(error => {
                 showResponse('cgiResponse', 'Error: ' + error.message, true);
+            });
+        });
+
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('fileInput');
+            const uploadPath = document.getElementById('uploadPath').value;
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showResponse('uploadResponse', 'Please select a file to upload', true);
+                return;
+            }
+
+            showResponse('uploadResponse', 'Uploading...');
+
+            const formData = new FormData();
+            formData.append('file', file);
+            if (uploadPath) {
+                formData.append('path', uploadPath);
+            }
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            }).then(response => {
+                if (response.ok) {
+                    return response.text().then(text => {
+                        showResponse('uploadResponse', 'File uploaded successfully!\n\n' + text);
+                    });
+                } else {
+                    return response.text().then(text => {
+                        showResponse('uploadResponse', 'Upload failed: ' + response.statusText + '\n\n' + text, true);
+                    });
+                }
+            }).catch(error => {
+                showResponse('uploadResponse', 'Error: ' + error.message, true);
             });
         });
     </script>
