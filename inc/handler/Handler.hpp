@@ -5,8 +5,8 @@
 
 class ConfigParser;
 class Request;
-class Server;
-class Location;
+struct Server;
+struct Location;
 
 class Handler {
 private:
