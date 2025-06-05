@@ -70,7 +70,7 @@ bool ConfigParser::isValueValid(const std::string& key, const std::string& value
 		return isValidCGIPath(value);
 
 	if (key == "return")
-		return isValidRedirect(value, loc, srv);
+		return isValidRedirect(value);
 	
 	return true;
 }
@@ -255,7 +255,7 @@ bool	ConfigParser::isValidIndex(const std::string& val, const Location& loc, con
 }
 
 //je gerer pas tout encore car j'ai pas tout capter mdr
-bool	ConfigParser::isValidRedirect(const std::string& val, const Location& loc, const Server& srv) const
+bool	ConfigParser::isValidRedirect(const std::string& val) const
 {
 	std::istringstream iss(val);
 	std::string codeStr;
@@ -266,9 +266,9 @@ bool	ConfigParser::isValidRedirect(const std::string& val, const Location& loc, 
 		return false;
 	int code = atoi(codeStr.c_str());
 	std::cout << "code : " << code << std::endl;
-	if (code != 301 && code != 302 && code != 307 && code != 308)
+	if (code < 100 || code > 599)
 		return false;
 	if (path.find("http://") == 0 || path.find("https://") == 0)
 		return true;
-	return (isValidPath(path, loc, srv, "root"));
+	return false;
 }

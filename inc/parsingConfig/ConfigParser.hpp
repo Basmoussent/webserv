@@ -48,7 +48,7 @@ class ConfigParser
 		bool		isValidCGIPath(const std::string& path) const;
 		bool		isValidErrorPage(const std::string& val, const Location& loc, const Server& srv) const;
 		bool		isValidIndex(const std::string& val, const Location& loc, const Server& srv) const;
-		bool		isValidRedirect(const std::string& val, const Location& loc, const Server& srv) const;
+		bool		isValidRedirect(const std::string& val) const;
 
 	public :
 		ConfigParser();

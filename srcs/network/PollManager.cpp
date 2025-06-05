@@ -6,7 +6,7 @@
 /*   By: bdenfir <bdenfir@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/04 17:08:25 by bdenfir           #+#    #+#             */
-/*   Updated: 2025/06/04 18:50:12 by bdenfir          ###   ########.fr       */
+/*   Updated: 2025/06/05 13:49:02 by bdenfir          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -222,15 +222,15 @@ void PollManager::run()
             pfd.revents = 0;
         }
 
-        // Enlever définitivement les FDs marquées
         for (size_t i = 0; i < to_remove.size(); ++i) {
             removeFromPoll(to_remove[i]);
         }
     }
     
     write(1, "[DEBUG] Nettoyage des ressources...\n", 36);
-    
+    std::cout << _pollfds.size() << " pollfds à fermer." << std::endl;
     for (size_t i = 0; i < _pollfds.size(); ++i) {
+        std::cout << "[DEBUG] Fermeture du FD " << _pollfds[i].fd << std::endl;
         if (_pollfds[i].fd > 2) {
             close(_pollfds[i].fd);
         }
@@ -261,6 +261,7 @@ void PollManager::removeFromPoll(int fd) {
     for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
         if (it->fd == fd) {
             _pollfds.erase(it);
+            close(fd);
             break;
         }
     }

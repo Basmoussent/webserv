@@ -352,6 +352,17 @@
             </form>
             <div id="uploadResponse" class="response-section"></div>
         </div>
+
+        <div class="form-section">
+            <h2>Test Redirection</h2>
+            <form id="redirectForm">
+                <label for="redirectUrl">Enter URL to redirect to:</label>
+                <input type="text" id="redirectUrl" name="redirectUrl" required 
+                       placeholder="e.g., https://www.example.com">
+                <button type="submit" class="redirect-btn">Test Redirection</button>
+            </form>
+            <div id="redirectResponse" class="response-section"></div>
+        </div>
     </div>
     <div class="footer">
         Made with <span>❤</span> by 42 Students
@@ -382,6 +393,7 @@
             hideResponse('headResponse');
             hideResponse('cgiResponse');
             hideResponse('uploadResponse');
+            hideResponse('redirectResponse');
         });
 
         document.getElementById('sendForm').addEventListener('submit', function(e) {
@@ -534,6 +546,30 @@
                 }
             }).catch(error => {
                 showResponse('uploadResponse', 'Error: ' + error.message, true);
+            });
+        });
+
+        document.getElementById('redirectForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const url = document.getElementById('redirectUrl').value;
+            showResponse('redirectResponse', 'Testing redirection...');
+
+            fetch('/redirect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ url: url })
+            })
+            .then(response => {
+                if (response.ok) {
+                    showResponse('redirectResponse', 'Redirection successful!');
+                } else {
+                    showResponse('redirectResponse', 'Redirection failed: ' + response.statusText, true);
+                }
+            })
+            .catch(error => {
+                showResponse('redirectResponse', 'Error: ' + error.message, true);
             });
         });
     </script>

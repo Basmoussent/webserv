@@ -68,7 +68,6 @@ bool	ConfigParser::parseFile(const std::string& filename)
 		std::cerr << "Error: block not closed correctly." << std::endl;
 		return false;
 	}
-
 	return true;
 }
 
@@ -222,23 +221,40 @@ bool	ConfigParser::checkMinimumConfig() const
 	return true;
 }
 
-bool	ConfigParser::assignKeyValue(const std::string& key, std::istringstream& iss)
+bool    ConfigParser::assignKeyValue(const std::string& key, std::istringstream& iss)
 {
-	std::string value, word;
-	while (iss >> word)
-	{
-		if (!value.empty())
-			value += " ";
-		value += word;
-	}
-	if (key.empty() || value.empty())
-	{
-		std::cerr << "Error: the directive '" << key << "' must have a value." << std::endl;
-		return false;
-	}
-	if (_inLocation)
-		_currentLocation.instruct[key] = value;
-	else if (_inServer)
-		_currentServer.instruct[key] = value;
-	return true;
+    std::string value, word;
+    if (key == "host")
+    {
+        iss >> word;
+        if (key.empty() || word.empty())
+        {
+            std::cerr << "Error: the directive '" << key << "' must have a value." << std::endl;
+            return false;
+        }
+        size_t pos = word.find(':');
+        if (pos == std::string::npos) {
+            _currentServer.instruct["host"] = word.substr(0, pos);
+            return true; 
+        }
+        _currentServer.instruct["host"] = word.substr(0, pos);
+        _currentServer.instruct["listen"] = word.substr(pos + 1);
+        return true;
+    }
+    while (iss >> word)
+    {
+        if (!value.empty())
+            value += " ";
+        value += word;
+    }
+    if (key.empty() || value.empty())
+    {
+        std::cerr << "Error: the directive '" << key << "' must have a value." << std::endl;
+        return false;
+    }
+    if (_inLocation)
+        _currentLocation.instruct[key] = value;
+    else if (_inServer)
+        _currentServer.instruct[key] = value;
+    return true;
 }

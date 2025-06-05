@@ -219,7 +219,7 @@ void Request::parseRequest(const std::string raw_request)
 	}
 	parseHeaders(headers_section);
 	parseBody(request_stream, body_section);
-	if (!_chunked && getHeader("Host").empty() && _multiform && _method != "POST")
+	if (!_chunked && getHeader("Host").empty())
 	{
 		std::cout << "Missing Host header in request" << std::endl;
 		std::cout << _multiform << std::endl;
@@ -349,10 +349,8 @@ void Request::parseHeaders(std::string header)
                 std::size_t boundary_pos = value.find("boundary=");
                 if (boundary_pos != std::string::npos)
                 {
-					std::cout << "Boundary found: " << value.substr(boundary_pos + 9) << std::endl;
 					_boundary = value.substr(boundary_pos + 9);
                     _multiform = true;
-					std::cout << "Multiform: " << _multiform << std::endl;
                 }
             }
             else if (key == "Transfer-Encoding" && value.find("chunked") != std::string::npos) {
@@ -389,7 +387,6 @@ std::ostream& operator<<(std::ostream& os, const Request& request)
 void Request::appendBody(const std::string& additional_data) {
 	_rawRequest += additional_data;
 	
-	// Si les headers n'ont pas encore été parsés, essayer de les parser
 	if (!_headersParsed) {
 		size_t header_end = _rawRequest.find("\r\n\r\n");
 		if (header_end != std::string::npos) {

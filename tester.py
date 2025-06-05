@@ -49,7 +49,7 @@ class WebservTester:
         config = {
             'port': 8002,
             'host': '127.0.0.1',
-            'server_name': 'localhost',
+            'server_name': 'ewufg',
             'root': 'html',
             'index': 'index.html',
             'error_pages': {},

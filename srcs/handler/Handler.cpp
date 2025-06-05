@@ -12,7 +12,6 @@
 #include <dirent.h>
 #include <fcntl.h>
 
-
 std::string Handler::intToString(int value) {
     std::stringstream ss;
     ss << value;
@@ -61,13 +60,37 @@ void Handler::process()
         for (i = 0; i < _configParser.getServers().size(); i++)
         {
             server = _configParser.getServers()[i];
-            if (_request.getHeader("Host") == server.instruct["host"] + ":" + server.instruct["listen"] || _request.getHeader("Host") == server.instruct["server_name"])
+            std::cout << "[DEBUG] Vérification du serveur: " << server.instruct["server_name"] + ":" + server.instruct["listen"] << std::endl;
+            std::cout << "[DEBUG] Host: " << _request.getHeader("Host") << std::endl;
+            
+            if (_request.getHeader("Host") == server.instruct["host"] + ":" + server.instruct["listen"])
                 break;
+            
+            if (_request.getHeader("Host") == server.instruct["host"])
+                break;
+            
+            std::istringstream serverNames(server.instruct["server_name"]);
+            std::string serverName;
+            bool found = false;
+            
+            while (std::getline(serverNames, serverName, ' ')) {
+                if (serverName.empty()) continue;
+                
+                if (_request.getHeader("Host") == serverName)
+                    found = true;
+                
+                if (_request.getHeader("Host") == serverName + ":" + server.instruct["listen"])
+                    found = true;
+                
+                if (found) break;
+            }
+            
+            if (found) break;
         }
         if (i == _configParser.getServers().size())
         {
             setStatusCode(404);
-            _response = buildResponse(404, "Not Found", "text/plain");
+            _response = buildResponse(404, "Not Found 1", "text/plain");
             return;
         }
 
@@ -104,6 +127,7 @@ void Handler::process()
         size_t j = 0;
         for (j = 0; j < server.locations.size(); j++)
         {
+            std::cout << "[DEBUG] Checking location: " << server.locations[j].path << std::endl;
             if (server.locations[j].path == _request.getUri())
             {
                 std::string allowedMethods = server.locations[j].instruct["allow_methods"];
@@ -133,11 +157,16 @@ void Handler::process()
         }
         if (!locationFound) {
             setStatusCode(404);
-            _response = buildResponse(404, "Not Found", "text/plain");
+            _response = buildResponse(404, "Not Found 2", "text/plain");
             return;
         }
-
-        if (_request.getUri().find("/cgi-bin/") == 0 || (_request.getUri().find("/cgi-bin") == 0 && _request.getUri().length() == 8))
+        std::cout << "[DEBUG] Location found: " << server.locations[j].path << std::endl;
+        std::cout << _request.getUri().find("/cgi-bin/") << " " << _request.getUri().find("/cgi-bin") << std::endl;
+        if (server.locations[j].instruct["return"] != "")
+        {
+            return redirect(server, j);
+        }
+        if (_request.getUri().find("/cgi-bin/") == 0 || (_request.getUri().find("/cgi-bin") == 0))
             handleCGI();
         else if (_request.getMethod() == "GET")
 			handleGet(server, j);
@@ -157,16 +186,29 @@ void Handler::process()
 	}
 }
 
+void Handler::redirect(Server &server, size_t j)
+{
+    std::string redirect = server.locations[j].instruct["return"];
+    std::string statusCodeStr = redirect.substr(0, redirect.find(' '));
+    int statusCode = std::atoi(statusCodeStr.c_str());
+    std::string location = redirect.substr(redirect.find(' ') + 1);
+
+    setStatusCode(statusCode);
+    std::string response = "HTTP/1.1 301 Moved Permanently\r\n";
+    response += "Location: " + location + "\r\n";
+    response += "\r\n";
+
+}
 void Handler::handleCGI()
 {
     Server server;
     Location location;
     bool found = false;
-    
+    std::cout << "[DEBUG] Handling CGI request" << std::endl;
     for (size_t i = 0; i < _configParser.getServers().size(); i++) {
         server = _configParser.getServers()[i];
         if (_request.getHeader("Host") == server.instruct["host"] + ":" + server.instruct["listen"] || 
-            _request.getHeader("Host") == server.instruct["server_name"]) {
+            _request.getHeader("Host").find(server.instruct["server_name"]) != std::string::npos) {
             for (size_t j = 0; j < server.locations.size(); j++) {
                 if (server.locations[j].path == "/cgi-bin") {
                     location = server.locations[j];
@@ -277,7 +319,7 @@ void Handler::handleCGI()
         env["REMOTE_PORT"] = server.instruct["listen"];
 
         std::string command;
-        if (extension == ".py" && interpreters.size() > 0) {
+        if (extension == ".pl" && interpreters.size() > 0) {
             command = interpreters[0] + " " + filename;
         } else if (extension == ".sh" && interpreters.size() > 1) {
             command = interpreters[1] + " " + filename;
@@ -339,20 +381,23 @@ void Handler::handleCGI()
         std::string output;
         char readBuffer[4096];
         ssize_t bytes_read;
-        while ((bytes_read = read(pipefd[0], readBuffer, sizeof(readBuffer) - 1)) > 0) {
-            readBuffer[bytes_read] = '\0';
-            output += readBuffer;
-        }
+        bytes_read = read(pipefd[0], readBuffer, sizeof(readBuffer));
+        readBuffer[bytes_read] = '\0';
+        output += readBuffer;
         close(pipefd[0]);
 
         int status;
         waitpid(pid, &status, 0);
-
-        if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+        if (WIFEXITED(status) != 0 && WEXITSTATUS(status) == 0) {
             setStatusCode(200);
             std::ostringstream len;
             len << output.size();
-            _response = buildResponse(200, output, "text/plain");
+            if (output.find("<!DOCTYPE html>") != std::string::npos || 
+            output.find("<html>") != std::string::npos) {
+                _response = buildResponse(200, output, "text/plain");
+            } else {
+                _response = buildResponse(200, output, "text/plain");
+            }
         } else {
             setStatusCode(500);
             _response = buildResponse(500, "Internal Server Error", "text/plain");
@@ -362,6 +407,7 @@ void Handler::handleCGI()
         setStatusCode(405);
         _response = buildResponse(405, "Method Not Allowed", "text/plain");
     }
+
 }
 
 std::string Handler::getMimeType(const std::string& path) const {
@@ -409,7 +455,7 @@ std::string Handler::buildResponse(int statusCode, const std::string& content, c
     }
     
     std::string response;
-    response.reserve(512 + content.length()); // Pré-allouer de l'espace pour éviter les réallocations
+    response.reserve(512 + content.length());
     
     response = "HTTP/1.1 " + intToString(statusCode) + " " + statusText + "\r\n";
     response += "Content-Type: " + contentType + "\r\n";
@@ -524,7 +570,10 @@ void Handler::handleGet(Server serv, int j)
     } else {
         indexFiles.push_back("index.html");
     }
+    
+    
     std::string fullPath = root + (uri[0] == '/' ? uri : "/" + uri);
+    std::cout << "Full path: " << fullPath << std::endl;
     if (stat(fullPath.c_str(), &buffer) != 0) {
         setStatusCode(404);
         std::string errorPage = getErrorPage(404);
@@ -653,16 +702,51 @@ std::string Handler::getUploadDirectory(const Server& server, const Location& lo
         return it->second;
     }
     
-    return "./html/uploads_default";
+    std::string baseRoot;
+    std::map<std::string, std::string>::const_iterator rootIt = location.instruct.find("root");
+    if (rootIt != location.instruct.end()) {
+        baseRoot = rootIt->second;
+    } else {
+        rootIt = server.instruct.find("root");
+        if (rootIt != server.instruct.end()) {
+            baseRoot = rootIt->second;
+        } else {
+            baseRoot = "./html";
+        }
+    }
+    
+    if (baseRoot.substr(0, 2) == "./") {
+        baseRoot = baseRoot.substr(2);
+    }
+    
+    return baseRoot + "/uploads_default";
 }
 
 bool Handler::handleFileUpload(const std::string& uploadDir, const std::string& filename, const std::string& content) {
     struct stat st;
     
-    // Vérifier si le répertoire existe et a les bonnes permissions
+    // Créer récursivement le répertoire s'il n'existe pas
     if (stat(uploadDir.c_str(), &st) != 0) {
-        if (mkdir(uploadDir.c_str(), 0755) != 0) {
-            std::cerr << "Error: Failed to create upload directory: " << uploadDir << " (errno: " << errno << ")" << std::endl;
+        // Créer tous les répertoires parents si nécessaire
+        std::string currentPath = "";
+        std::istringstream pathStream(uploadDir);
+        std::string segment;
+        
+        while (std::getline(pathStream, segment, '/')) {
+            if (!segment.empty()) {
+                currentPath += segment + "/";
+                if (stat(currentPath.c_str(), &st) != 0) {
+                    if (mkdir(currentPath.c_str(), 0755) != 0) {
+                        std::cerr << "Error: Failed to create directory: " << currentPath << " (errno: " << errno << ")" << std::endl;
+                        return false;
+                    }
+                }
+            }
+        }
+        
+        // Vérifier une dernière fois que le répertoire final existe
+        if (stat(uploadDir.c_str(), &st) != 0) {
+            std::cerr << "Error: Upload directory still doesn't exist after creation: " << uploadDir << std::endl;
             return false;
         }
     } else if (!(st.st_mode & S_IWUSR)) {

@@ -35,6 +35,7 @@ public:
     ~Handler();
 
     void process();
+    void redirect(Server &server, size_t j);
     void handleGet(Server serv, int j);
     void handlePost(std::string& path);
     void handleDelete();
