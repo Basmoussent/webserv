@@ -2,3 +2,5 @@
 *.o
 ./build
 ./log/
+.DS_Store
+webserv_push0/
