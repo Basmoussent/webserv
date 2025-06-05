@@ -71,64 +71,48 @@ void Handler::process()
             return;
         }
 
-        std::string contentLength = _request.getHeader("Content-Length");
-        if (!contentLength.empty()) {
-            size_t bodySize = std::atoi(contentLength.c_str());
-            size_t maxSize = 0;
-            bool locationFound = false;
-            size_t j = 0;
-            for (j = 0; j < server.locations.size(); j++) {
-                if (server.locations[j].path == _request.getUri()) {
-                    locationFound = true;
-                    if (!server.locations[j].instruct["client_max_body_size"].empty()) {
-                        maxSize = std::atoi(server.locations[j].instruct["client_max_body_size"].c_str());
-                    }
-                    break;
-                }
-            }
-            
-            if (!locationFound || maxSize == 0) {
-                if (!server.instruct["client_max_body_size"].empty()) {
-                    maxSize = std::atoi(server.instruct["client_max_body_size"].c_str());
-                }
-            }
-            
-            if (maxSize > 0 && bodySize > maxSize) {
-                setStatusCode(413);
-                _response = buildResponse(413, "Request Entity Too Large", "text/plain");
-                return;
-            }
-        }
+
 
         bool locationFound = false;
         size_t j = 0;
-        for (j = 0; j < server.locations.size(); j++)
+        size_t bestMatchLength = 0;
+        
+        // Find the most specific location (longest path that matches)
+        for (size_t i = 0; i < server.locations.size(); i++)
         {
-            if (server.locations[j].path == _request.getUri())
-            {
-                std::string allowedMethods = server.locations[j].instruct["allow_methods"];
-                if (allowedMethods.find(_request.getMethod()) == std::string::npos)
-                {
-                    if (_request.getMethod() != "GET" &&  _request.getMethod() != "POST" && _request.getMethod() != "DELETE" && _request.getMethod() != "HEAD")
-                    {
-                        setStatusCode(501);
-                        _response = buildResponse(501, "Not Implemented", "text/plain");
-                        return;
+            std::string locationPath = server.locations[i].path;
+            std::string uri = _request.getUri();
+            
+            // Check if the URI starts with the location path
+            if (uri.find(locationPath) == 0) {
+                // For exact matches or if location ends with '/', it's a valid match
+                if (uri == locationPath || 
+                    locationPath == "/" ||
+                    (locationPath.length() < uri.length() && uri[locationPath.length()] == '/')) {
+                    
+                    // Choose the longest matching path (most specific)
+                    if (locationPath.length() > bestMatchLength) {
+                        bestMatchLength = locationPath.length();
+                        j = i;
+                        locationFound = true;
                     }
-                    setStatusCode(405);
-                    _response = buildResponse(405, "Method Not Allowed", "text/plain");
-                    return;
                 }
-                locationFound = true;
-                break;
             }
         }
-        if (!locationFound) {
-            for (j = 0; j < server.locations.size(); j++) {
-                if (server.locations[j].path == "/") {
-                    locationFound = true;
-                    break;
+        
+        if (locationFound) {
+            std::string allowedMethods = server.locations[j].instruct["allow_methods"];
+            if (allowedMethods.find(_request.getMethod()) == std::string::npos)
+            {
+                if (_request.getMethod() != "GET" &&  _request.getMethod() != "POST" && _request.getMethod() != "DELETE" && _request.getMethod() != "HEAD")
+                {
+                    setStatusCode(501);
+                    _response = buildResponse(501, "Not Implemented", "text/plain");
+                    return;
                 }
+                setStatusCode(405);
+                _response = buildResponse(405, "Method Not Allowed", "text/plain");
+                return;
             }
         }
         if (!locationFound) {
@@ -137,16 +121,91 @@ void Handler::process()
             return;
         }
 
-        if (_request.getUri().find("/cgi-bin/") == 0 || (_request.getUri().find("/cgi-bin") == 0 && _request.getUri().length() == 8))
+        // Check if this location has CGI configured and if the file extension matches
+        bool isCGI = false;
+        if (_request.getUri().find("/cgi-bin/") == 0 || (_request.getUri().find("/cgi-bin") == 0 && _request.getUri().length() == 8)) {
+            isCGI = true;
+        } else {
+            // Check if current location has CGI extensions configured
+            std::string cgiExt = server.locations[j].instruct["cgi_ext"];
+            if (!cgiExt.empty()) {
+                std::string uri = _request.getUri();
+                size_t dotPos = uri.find_last_of(".");
+                if (dotPos != std::string::npos) {
+                    std::string extension = uri.substr(dotPos);
+                    if (cgiExt.find(extension) != std::string::npos) {
+                        isCGI = true;
+                    }
+                }
+            }
+        }
+        
+        if (isCGI) {
+            std::cout << "[DEBUG] Request identified as CGI, calling handleCGI()" << std::endl;
             handleCGI();
-        else if (_request.getMethod() == "GET")
-			handleGet(server, j);
-		else if (_request.getMethod() == "POST")
-			handlePost(server.locations[j].path);
-		else if (_request.getMethod() == "DELETE")
-			handleDelete();
-        else if (_request.getMethod() == "HEAD")
-            handleHead(server, j);
+        } else {
+            std::cout << "[DEBUG] Request not CGI, validating body size" << std::endl;
+            // For non-CGI requests, validate body size
+            std::string contentLength = _request.getHeader("Content-Length");
+            
+            // For POST requests, check if it's chunked transfer or has Content-Length
+            if (_request.getMethod() == "POST" && contentLength.empty()) {
+                                 // Check if it's chunked transfer encoding
+                 std::string transferEncoding = _request.getHeader("Transfer-Encoding");
+                 std::cout << "[DEBUG] Transfer-Encoding header: '" << transferEncoding << "'" << std::endl;
+                 std::cout << "[DEBUG] Body length: " << _request.getBody().length() << std::endl;
+                 
+                 if (transferEncoding.find("chunked") == std::string::npos) {
+                    std::cout << "[DEBUG] POST request without Content-Length or chunked encoding, rejecting with 400" << std::endl;
+                    setStatusCode(400);
+                    _response = buildResponse(400, "Bad Request - Content-Length or chunked encoding required for POST", "text/plain");
+                    return;
+                } else {
+                    // For chunked requests, validate body size after parsing
+                    size_t bodySize = _request.getBody().length();
+                    size_t maxSize = 0;
+                    
+                    if (!server.locations[j].instruct["client_max_body_size"].empty()) {
+                        maxSize = std::atoi(server.locations[j].instruct["client_max_body_size"].c_str());
+                    } else if (!server.instruct["client_max_body_size"].empty()) {
+                        maxSize = std::atoi(server.instruct["client_max_body_size"].c_str());
+                    }
+                    
+                    if (maxSize > 0 && bodySize > maxSize) {
+                        std::cout << "[DEBUG] Chunked POST body size " << bodySize << " exceeds limit " << maxSize << ", returning 413" << std::endl;
+                        setStatusCode(413);
+                        _response = buildResponse(413, "Request Entity Too Large", "text/plain");
+                        return;
+                    }
+                }
+            }
+            
+            if (!contentLength.empty()) {
+                size_t bodySize = std::atoi(contentLength.c_str());
+                size_t maxSize = 0;
+                
+                if (!server.locations[j].instruct["client_max_body_size"].empty()) {
+                    maxSize = std::atoi(server.locations[j].instruct["client_max_body_size"].c_str());
+                } else if (!server.instruct["client_max_body_size"].empty()) {
+                    maxSize = std::atoi(server.instruct["client_max_body_size"].c_str());
+                }
+                
+                if (maxSize > 0 && bodySize > maxSize) {
+                    setStatusCode(413);
+                    _response = buildResponse(413, "Request Entity Too Large", "text/plain");
+                    return;
+                }
+            }
+            
+            if (_request.getMethod() == "GET")
+                handleGet(server, j);
+            else if (_request.getMethod() == "POST")
+                handlePost(server.locations[j].path);
+            else if (_request.getMethod() == "DELETE")
+                handleDelete();
+            else if (_request.getMethod() == "HEAD")
+                handleHead(server, j);
+        }
 		setValid(true);
 	}
 	else
@@ -163,15 +222,127 @@ void Handler::handleCGI()
     Location location;
     bool found = false;
     
+    // Validate body size for CGI requests too
+    std::string contentLength = _request.getHeader("Content-Length");
+    std::cout << "[DEBUG] CGI Content-Length header: '" << contentLength << "'" << std::endl;
+    
+    // Check for chunked transfer encoding if no Content-Length
+    if (contentLength.empty()) {
+        std::string transferEncoding = _request.getHeader("Transfer-Encoding");
+        std::cout << "[DEBUG] CGI Transfer-Encoding header: '" << transferEncoding << "'" << std::endl;
+        std::cout << "[DEBUG] CGI Body length: " << _request.getBody().length() << std::endl;
+        
+        if (transferEncoding.find("chunked") != std::string::npos) {
+            // For chunked CGI requests, validate body size
+            size_t bodySize = _request.getBody().length();
+            size_t maxSize = 0;
+            
+            // Find the server and location first to get the correct body size limit
+            for (size_t i = 0; i < _configParser.getServers().size(); i++) {
+                Server tempServer = _configParser.getServers()[i];
+                if (_request.getHeader("Host") == tempServer.instruct["host"] + ":" + tempServer.instruct["listen"] || 
+                    _request.getHeader("Host") == tempServer.instruct["server_name"]) {
+                    
+                    std::string uri = _request.getUri();
+                    size_t bestMatchLength = 0;
+                    for (size_t j = 0; j < tempServer.locations.size(); j++) {
+                        std::string locationPath = tempServer.locations[j].path;
+                        if (uri.find(locationPath) == 0) {
+                            if (uri == locationPath || 
+                                locationPath == "/" ||
+                                (locationPath.length() < uri.length() && uri[locationPath.length()] == '/')) {
+                                
+                                if (locationPath.length() > bestMatchLength) {
+                                    bestMatchLength = locationPath.length();
+                                    Location tempLocation = tempServer.locations[j];
+                                    
+                                    if (!tempLocation.instruct["client_max_body_size"].empty()) {
+                                        maxSize = std::atoi(tempLocation.instruct["client_max_body_size"].c_str());
+                                    } else if (!tempServer.instruct["client_max_body_size"].empty()) {
+                                        maxSize = std::atoi(tempServer.instruct["client_max_body_size"].c_str());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+            
+            if (maxSize > 0 && bodySize > maxSize) {
+                std::cout << "[DEBUG] CGI Chunked body size " << bodySize << " exceeds limit " << maxSize << ", returning 413" << std::endl;
+                setStatusCode(413);
+                _response = buildResponse(413, "Request Entity Too Large", "text/plain");
+                return;
+            }
+        }
+    }
+    
+    if (!contentLength.empty()) {
+        size_t bodySize = std::atoi(contentLength.c_str());
+        size_t maxSize = 0;
+        
+        // Find the server and location first to get the correct body size limit
+        for (size_t i = 0; i < _configParser.getServers().size(); i++) {
+            Server tempServer = _configParser.getServers()[i];
+            if (_request.getHeader("Host") == tempServer.instruct["host"] + ":" + tempServer.instruct["listen"] || 
+                _request.getHeader("Host") == tempServer.instruct["server_name"]) {
+                
+                std::string uri = _request.getUri();
+                size_t bestMatchLength = 0;
+                for (size_t j = 0; j < tempServer.locations.size(); j++) {
+                    std::string locationPath = tempServer.locations[j].path;
+                    if (uri.find(locationPath) == 0) {
+                        if (uri == locationPath || 
+                            locationPath == "/" ||
+                            (locationPath.length() < uri.length() && uri[locationPath.length()] == '/')) {
+                            
+                            if (locationPath.length() > bestMatchLength) {
+                                bestMatchLength = locationPath.length();
+                                Location tempLocation = tempServer.locations[j];
+                                
+                                if (!tempLocation.instruct["client_max_body_size"].empty()) {
+                                    maxSize = std::atoi(tempLocation.instruct["client_max_body_size"].c_str());
+                                } else if (!tempServer.instruct["client_max_body_size"].empty()) {
+                                    maxSize = std::atoi(tempServer.instruct["client_max_body_size"].c_str());
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+        }
+        
+        if (maxSize > 0 && bodySize > maxSize) {
+            std::cout << "[DEBUG] CGI Body size " << bodySize << " exceeds limit " << maxSize << ", returning 413" << std::endl;
+            setStatusCode(413);
+            _response = buildResponse(413, "Request Entity Too Large", "text/plain");
+            return;
+        }
+    }
+    
     for (size_t i = 0; i < _configParser.getServers().size(); i++) {
         server = _configParser.getServers()[i];
         if (_request.getHeader("Host") == server.instruct["host"] + ":" + server.instruct["listen"] || 
             _request.getHeader("Host") == server.instruct["server_name"]) {
+            
+            // First try to find the matching location for this URI
+            std::string uri = _request.getUri();
+            size_t bestMatchLength = 0;
             for (size_t j = 0; j < server.locations.size(); j++) {
-                if (server.locations[j].path == "/cgi-bin") {
-                    location = server.locations[j];
-                    found = true;
-                    break;
+                std::string locationPath = server.locations[j].path;
+                if (uri.find(locationPath) == 0) {
+                    if (uri == locationPath || 
+                        locationPath == "/" ||
+                        (locationPath.length() < uri.length() && uri[locationPath.length()] == '/')) {
+                        
+                        if (locationPath.length() > bestMatchLength) {
+                            bestMatchLength = locationPath.length();
+                            location = server.locations[j];
+                            found = true;
+                        }
+                    }
                 }
             }
             if (found) break;
@@ -241,6 +412,128 @@ void Handler::handleCGI()
     }
 
     if (_request.getMethod() == "POST") {
+        // For .bla files, call cgi_test executable
+        if (extension == ".bla") {
+            std::map<std::string, std::string> env;
+            env["REQUEST_METHOD"] = _request.getMethod();
+            env["CONTENT_LENGTH"] = sizeToString(_request.getBody().length());
+            env["CONTENT_TYPE"] = _request.getHeader("Content-Type");
+            env["SCRIPT_NAME"] = _request.getUri();
+            env["SERVER_PROTOCOL"] = "HTTP/1.1";
+            env["SERVER_SOFTWARE"] = "webserv/1.0";
+
+            std::string command = "./cgi_test";
+
+            int pipefd_out[2];  // For reading CGI output
+            int pipefd_in[2];   // For sending POST data to CGI
+            if (pipe(pipefd_out) == -1 || pipe(pipefd_in) == -1) {
+                setStatusCode(500);
+                _response = buildResponse(500, "Internal Server Error", "text/plain");
+                return;
+            }
+
+            pid_t pid = fork();
+            if (pid == -1) {
+                close(pipefd_out[0]);
+                close(pipefd_out[1]);
+                close(pipefd_in[0]);
+                close(pipefd_in[1]);
+                setStatusCode(500);
+                _response = buildResponse(500, "Internal Server Error", "text/plain");
+                return;
+            }
+
+            if (pid == 0) {
+                // Child process (CGI)
+                std::vector<std::string> envStrings;
+                for (std::map<std::string, std::string>::iterator it = env.begin(); it != env.end(); ++it) {
+                    envStrings.push_back(it->first + "=" + it->second);
+                }
+                
+                std::vector<char*> envArray;
+                for (std::vector<std::string>::iterator it = envStrings.begin(); it != envStrings.end(); ++it) {
+                    envArray.push_back(const_cast<char*>(it->c_str()));
+                }
+                envArray.push_back(NULL);
+
+                // Redirect stdin and stdout
+                dup2(pipefd_in[0], STDIN_FILENO);   // Read POST data from parent
+                dup2(pipefd_out[1], STDOUT_FILENO); // Send output to parent
+                
+                // Close all pipe file descriptors
+                close(pipefd_in[0]);
+                close(pipefd_in[1]);
+                close(pipefd_out[0]);
+                close(pipefd_out[1]);
+
+                execve("./cgi_test", NULL, &envArray[0]);
+                exit(1);
+            }
+
+            // Parent process
+            close(pipefd_in[0]);  // Close read end of input pipe
+            close(pipefd_out[1]); // Close write end of output pipe
+            
+            // Send POST data to CGI via stdin
+            std::string postBody = _request.getBody();
+            if (!postBody.empty()) {
+                ssize_t written = write(pipefd_in[1], postBody.c_str(), postBody.length());
+                (void)written; // Suppress unused variable warning
+            }
+            close(pipefd_in[1]); // Close write end to signal EOF to CGI
+            
+            // Read CGI output
+            std::string output;
+            char readBuffer[4096];
+            ssize_t bytes_read;
+            while ((bytes_read = read(pipefd_out[0], readBuffer, sizeof(readBuffer) - 1)) > 0) {
+                readBuffer[bytes_read] = '\0';
+                output += readBuffer;
+            }
+            close(pipefd_out[0]);
+
+            int status;
+            waitpid(pid, &status, 0);
+
+            if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+                setStatusCode(200);
+                // Parse CGI output to separate headers from body
+                size_t headerEnd = output.find("\r\n\r\n");
+                if (headerEnd != std::string::npos) {
+                    // We have headers + body
+                    std::string cgiHeaders = output.substr(0, headerEnd);
+                    std::string cgiBody = output.substr(headerEnd + 4);
+                    
+                    // Parse Content-Type from CGI headers
+                    std::string contentType = "text/html"; // Default
+                    size_t ctPos = cgiHeaders.find("Content-Type:");
+                    if (ctPos != std::string::npos) {
+                        size_t start = ctPos + strlen("Content-Type:");
+                        size_t end = cgiHeaders.find("\r\n", start);
+                        if (end == std::string::npos) end = cgiHeaders.length();
+                        contentType = cgiHeaders.substr(start, end - start);
+                        // Trim leading/trailing whitespace from contentType
+                        size_t first = contentType.find_first_not_of(" 	");
+                        if (std::string::npos == first) {
+                            contentType = "";
+                        } else {
+                            size_t last = contentType.find_last_not_of(" 	");
+                            contentType = contentType.substr(first, (last - first + 1));
+                        }
+                    }
+                    _response = buildResponse(200, cgiBody, contentType);
+                } else {
+                    // No headers, treat as plain body (or handle error)
+                    _response = buildResponse(200, output, "text/html");
+                }
+            } else {
+                setStatusCode(500);
+                _response = buildResponse(500, "Internal Server Error", "text/plain");
+            }
+            return;
+        }
+        
+        // For other files, return file content
         std::ifstream file(filename.c_str(), std::ios::binary);
         if (!file) {
             setStatusCode(500);
@@ -265,10 +558,111 @@ void Handler::handleCGI()
         return;
     }
     else if (_request.getMethod() == "GET") {
+        // For .bla files, call cgi_test executable
+        if (extension == ".bla") {
+            std::map<std::string, std::string> env;
+            env["REQUEST_METHOD"] = _request.getMethod();
+            env["QUERY_STRING"] = _request.getQueryString();
+            env["CONTENT_LENGTH"] = sizeToString(_request.getBody().length());
+            env["CONTENT_TYPE"] = _request.getHeader("Content-Type");
+            env["SCRIPT_NAME"] = _request.getUri();
+            env["SERVER_PROTOCOL"] = "HTTP/1.1";
+            env["SERVER_SOFTWARE"] = "webserv/1.0";
+
+            std::string command = "./cgi_test";
+
+            int pipefd[2];
+            if (pipe(pipefd) == -1) {
+                setStatusCode(500);
+                _response = buildResponse(500, "Internal Server Error", "text/plain");
+                return;
+            }
+
+            pid_t pid = fork();
+            if (pid == -1) {
+                close(pipefd[0]);
+                close(pipefd[1]);
+                setStatusCode(500);
+                _response = buildResponse(500, "Internal Server Error", "text/plain");
+                return;
+            }
+
+            if (pid == 0) {
+                std::vector<std::string> envStrings;
+                for (std::map<std::string, std::string>::iterator it = env.begin(); it != env.end(); ++it) {
+                    envStrings.push_back(it->first + "=" + it->second);
+                }
+                
+                std::vector<char*> envArray;
+                for (std::vector<std::string>::iterator it = envStrings.begin(); it != envStrings.end(); ++it) {
+                    envArray.push_back(const_cast<char*>(it->c_str()));
+                }
+                envArray.push_back(NULL);
+
+                dup2(pipefd[1], STDOUT_FILENO);
+                close(pipefd[0]);
+                close(pipefd[1]);
+
+                execve("./cgi_test", NULL, &envArray[0]);
+                exit(1);
+            }
+
+            close(pipefd[1]);
+            
+            std::string output;
+            char readBuffer[4096];
+            ssize_t bytes_read;
+            while ((bytes_read = read(pipefd[0], readBuffer, sizeof(readBuffer) - 1)) > 0) {
+                readBuffer[bytes_read] = '\0';
+                output += readBuffer;
+            }
+            close(pipefd[0]);
+
+            int status;
+            waitpid(pid, &status, 0);
+
+            if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+                setStatusCode(200);
+                // Parse CGI output to separate headers from body
+                size_t headerEnd = output.find("\r\n\r\n");
+                if (headerEnd != std::string::npos) {
+                    // We have headers + body
+                    std::string cgiHeaders = output.substr(0, headerEnd);
+                    std::string cgiBody = output.substr(headerEnd + 4);
+                    
+                    // Parse Content-Type from CGI headers
+                    std::string contentType = "text/html"; // Default
+                    size_t ctPos = cgiHeaders.find("Content-Type:");
+                    if (ctPos != std::string::npos) {
+                        size_t start = ctPos + strlen("Content-Type:");
+                        size_t end = cgiHeaders.find("\r\n", start);
+                        if (end == std::string::npos) end = cgiHeaders.length();
+                        contentType = cgiHeaders.substr(start, end - start);
+                        // Trim leading/trailing whitespace from contentType
+                        size_t first = contentType.find_first_not_of(" 	");
+                        if (std::string::npos == first) {
+                            contentType = "";
+                        } else {
+                            size_t last = contentType.find_last_not_of(" 	");
+                            contentType = contentType.substr(first, (last - first + 1));
+                        }
+                    }
+                    _response = buildResponse(200, cgiBody, contentType);
+                } else {
+                    // No headers, treat as plain body (or handle error)
+                    _response = buildResponse(200, output, "text/html");
+                }
+            } else {
+                setStatusCode(500);
+                _response = buildResponse(500, "Internal Server Error", "text/plain");
+            }
+            return;
+        }
+        
         std::map<std::string, std::string> env;
         env["REQUEST_METHOD"] = _request.getMethod();
         env["QUERY_STRING"] = _request.getQueryString();
-        env["CONTENT_LENGTH"] = _request.getHeader("Content-Length");
+        env["CONTENT_LENGTH"] = sizeToString(_request.getBody().length());
         env["CONTENT_TYPE"] = _request.getHeader("Content-Type");
         env["SCRIPT_NAME"] = _request.getUri();
         env["SERVER_PROTOCOL"] = "HTTP/1.1";
@@ -277,10 +671,12 @@ void Handler::handleCGI()
         env["REMOTE_PORT"] = server.instruct["listen"];
 
         std::string command;
-        if (extension == ".py" && interpreters.size() > 0) {
+        if (extension == ".pl" && interpreters.size() > 0) {
             command = interpreters[0] + " " + filename;
-        } else if (extension == ".sh" && interpreters.size() > 1) {
+        } else if (extension == ".py" && interpreters.size() > 1) {
             command = interpreters[1] + " " + filename;
+        } else if (extension == ".sh" && interpreters.size() > 2) {
+            command = interpreters[2] + " " + filename;
         } else {
             setStatusCode(500);
             _response = buildResponse(500, "Internal Server Error", "text/plain");
@@ -492,10 +888,10 @@ void Handler::handleGet(Server serv, int j)
         }
     }
     
-    if (!serv.instruct["root"].empty())
-        root = serv.instruct["root"];
-    else if (!serv.locations[j].instruct["root"].empty())
+    if (!serv.locations[j].instruct["root"].empty())
         root = serv.locations[j].instruct["root"];
+    else if (!serv.instruct["root"].empty())
+        root = serv.instruct["root"];
     else {
         setStatusCode(500);
         _response = buildResponse(500, "Internal Server Error", "text/plain");
@@ -524,7 +920,18 @@ void Handler::handleGet(Server serv, int j)
     } else {
         indexFiles.push_back("index.html");
     }
-    std::string fullPath = root + (uri[0] == '/' ? uri : "/" + uri);
+    
+    // Remove the location path prefix from URI to construct the correct path
+    std::string locationPath = serv.locations[j].path;
+    std::string relativePath = uri;
+    if (uri.find(locationPath) == 0) {
+        relativePath = uri.substr(locationPath.length());
+        if (relativePath.empty()) {
+            relativePath = "/";
+        }
+    }
+    
+    std::string fullPath = root + (relativePath[0] == '/' ? relativePath : "/" + relativePath);
     if (stat(fullPath.c_str(), &buffer) != 0) {
         setStatusCode(404);
         std::string errorPage = getErrorPage(404);
@@ -548,9 +955,9 @@ void Handler::handleGet(Server serv, int j)
                 _response = buildResponse(200, autoindexHtml, "text/html");
                 return;
             } else {
-                setStatusCode(403);
-                std::string errorPage = getErrorPage(403);
-                _response = buildResponse(403, errorPage, "text/html");
+                setStatusCode(404);
+                std::string errorPage = getErrorPage(404);
+                _response = buildResponse(404, errorPage, "text/html");
                 return;
             }
         }
@@ -759,9 +1166,10 @@ std::string Handler::extractContentFromMultipart(const std::string& body, const 
 void Handler::handlePost(std::string& path)
 {
     const std::string& body = _request.getBody();
-    std::string pathCheck = path;
-    if (_request.getUri() != path && _request.getUri() != (pathCheck + "/"))
-    {
+    std::string uri = _request.getUri();
+    
+    // Check if the URI starts with the location path
+    if (uri.find(path) != 0) {
         setStatusCode(500);
         _response = buildResponse(500, "Internal Server Error - Invalid path", "text/plain");
         return;

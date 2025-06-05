@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Webserv Test Page</title>
+</head>
+<body>
+    <h1>Hello from Webserv!</h1>
+    <p>This is a test page for the tester.</p>
+</body>
+</html> 

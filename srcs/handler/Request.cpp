@@ -67,8 +67,45 @@ void Request::feed(const char* buffer, size_t bytes_read)
 			parseHeaders(headers_section);
 			_headersParsed = true;
 			
-			// Extraire le corps de la requête
-			_body = _rawRequest.substr(header_end + 4);
+			// Extraire le corps de la requête en tenant compte du chunked encoding
+			std::string body_data = _rawRequest.substr(header_end + 4);
+			if (_chunked) {
+				// Parse chunked body
+				std::istringstream body_stream(body_data);
+				std::string parsed_body;
+				std::string line;
+				while (std::getline(body_stream, line)) {
+					std::cout << "Feed parsing chunked body line: [" << line << "]" << std::endl;
+					if (!line.empty() && line[line.length() - 1] == '\r') {
+						line = line.substr(0, line.length() - 1);
+					}
+					if (line.empty()) {
+						continue;
+					}
+					size_t chunk_size;
+					try {
+						chunk_size = std::strtoul(line.c_str(), NULL, 16);
+						std::cout << "Feed chunk size: " << chunk_size << std::endl;
+					} catch (const std::exception&) {
+						std::cout << "Feed failed to parse chunk size from: " << line << std::endl;
+						continue;
+					}
+					if (chunk_size == 0) {
+						std::cout << "Feed found end chunk" << std::endl;
+						break;
+					}
+					std::string chunk;
+					chunk.resize(chunk_size);
+					body_stream.read(&chunk[0], chunk_size);
+					char crlf[2];
+					body_stream.read(crlf, 2);
+					std::cout << "Feed read chunk content: [" << chunk.substr(0, 50) << "...]" << std::endl;
+					parsed_body += chunk;
+				}
+				_body = parsed_body;
+			} else {
+				_body = body_data;
+			}
 			_rawRequest.clear();
 			
 			// Mettre à jour la longueur du contenu
@@ -408,7 +445,39 @@ void Request::appendBody(const std::string& additional_data) {
 	// Mettre à jour le body
 	size_t body_start = _rawRequest.find("\r\n\r\n");
 	if (body_start != std::string::npos) {
-		_body = _rawRequest.substr(body_start + 4);
+		if (_chunked) {
+			// Pour chunked, parser les chunks reçus jusqu'à présent
+			std::string body_data = _rawRequest.substr(body_start + 4);
+			std::istringstream body_stream(body_data);
+			std::string parsed_body;
+			std::string line;
+			while (std::getline(body_stream, line)) {
+				if (!line.empty() && line[line.length() - 1] == '\r') {
+					line = line.substr(0, line.length() - 1);
+				}
+				if (line.empty()) {
+					continue;
+				}
+				size_t chunk_size;
+				try {
+					chunk_size = std::strtoul(line.c_str(), NULL, 16);
+				} catch (const std::exception&) {
+					continue;
+				}
+				if (chunk_size == 0) {
+					break;
+				}
+				std::string chunk;
+				chunk.resize(chunk_size);
+				body_stream.read(&chunk[0], chunk_size);
+				char crlf[2];
+				body_stream.read(crlf, 2);
+				parsed_body += chunk;
+			}
+			_body = parsed_body;
+		} else {
+			_body = _rawRequest.substr(body_start + 4);
+		}
 	}
 }
 
@@ -416,6 +485,12 @@ bool Request::isComplete() const {
 	if (!_headersParsed) {
 		return false;
 	}
+	
+	if (_chunked) {
+		// Pour les requêtes chunked, on vérifie si on a reçu le chunk de fin (0)
+		return _rawRequest.find("\r\n0\r\n\r\n") != std::string::npos;
+	}
+	
 	if (_contentLength == 0) {
 		return true;
 	}

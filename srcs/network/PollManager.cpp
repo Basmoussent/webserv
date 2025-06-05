@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   PollManager.cpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: bdenfir <bdenfir@student.42.fr>            +#+  +:+       +#+        */
+/*   By: yuewang <yuewang@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/04 17:08:25 by bdenfir           #+#    #+#             */
-/*   Updated: 2025/06/04 18:50:12 by bdenfir          ###   ########.fr       */
+/*   Updated: 2025/06/05 15:58:19 by yuewang          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <netinet/in.h>  // Pour sockaddr_in
+#include <sstream>
 
 // Helper pour mettre un fd en non-bloquant
 void setNonBlocking(int fd) {
@@ -160,8 +161,27 @@ void PollManager::run()
 
                     // Vérifier si on a une requête HTTP complète
                     std::string& fullBuffer = clientBuffers[pfd.fd];
+                    bool isComplete = false;
+                    
                     if (fullBuffer.find("\r\n\r\n") != std::string::npos) {
-                        write(1, "[DEBUG] Requête HTTP complète détectée\n", 40);
+                        // Check if it's a chunked request
+                        if (fullBuffer.find("Transfer-Encoding: chunked") != std::string::npos) {
+                            write(1, "[DEBUG] Détection requête chunked\n", 35);
+                            // For chunked requests, wait for the final chunk (0\r\n\r\n)
+                            if (fullBuffer.find("\r\n0\r\n\r\n") != std::string::npos) {
+                                isComplete = true;
+                                write(1, "[DEBUG] Requête HTTP chunked complète détectée\n", 48);
+                            } else {
+                                write(1, "[DEBUG] Requête chunked incomplète, attente...\n", 48);
+                            }
+                        } else {
+                            // For regular requests, headers end is enough
+                            isComplete = true;
+                            write(1, "[DEBUG] Requête HTTP complète détectée\n", 40);
+                        }
+                    }
+                    
+                    if (isComplete) {
                         
                         try {
                             Request request(fullBuffer);
@@ -185,7 +205,11 @@ void PollManager::run()
                                     to_remove.push_back(pfd.fd);
                                 } else {
                                     write(1, "[DEBUG] Réponse envoyée avec succès\n", 39);
-                                    write(1, "[DEBUG] Nombre d'octets envoyés: ", 35);
+                                    // Convert int to string and print to fd 1
+                                    std::stringstream ss_sent;
+                                    ss_sent << "[DEBUG] Nombre d'octets envoyés: " << sent << "\n";
+                                    std::string sent_str = ss_sent.str();
+                                    write(1, sent_str.c_str(), sent_str.length());
                                     std::cout << "[DEBUG] Status Code: "<<handler->getStatusCode() << std::endl;
                                     
                                     std::string connection = request.getHeader("Connection");
@@ -194,7 +218,7 @@ void PollManager::run()
                                     } else {
                                         write(1, "[DEBUG] Client demande la fermeture de la connexion\n", 52);
                                         to_remove.push_back(pfd.fd);
-                                        close(pfd.fd);
+                                        // Ne pas fermer immédiatement - sera fermé par removeFromPoll()
                                     }
                                 }
                                 // Le handler sera supprimé par cleanupHandlers() ou removeFromPoll()
@@ -261,6 +285,7 @@ void PollManager::removeFromPoll(int fd) {
     for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
         if (it->fd == fd) {
             _pollfds.erase(it);
+            close(fd);  // Fermer la connexion proprement
             break;
         }
     }

@@ -98,7 +98,7 @@ bool ConfigParser::isValidExtension(const std::string& s) const
     std::string token;
 
     while (iss >> token) {
-        if (token != ".pl" && token != ".sh") {
+        if (token != ".pl" && token != ".sh" && token != ".py" && token != ".bla") {
             return false;
         }
     }

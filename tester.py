@@ -640,7 +640,15 @@ class WebservTester:
         print(f"{Colors.colorize('Serveur:', Colors.BLUE)} {Colors.colorize(self.base_url, Colors.WHITE)}")
         print(f"{Colors.colorize('Binaire:', Colors.BLUE)} {Colors.colorize(self.webserv_binary, Colors.WHITE)}\n")
         
-        # Tests de base
+        # Test de démarrage du serveur
+        print(f"\n{Colors.colorize('--- Test de démarrage du serveur ---', Colors.CYAN + Colors.BOLD)}")
+        self.test_server_startup()
+        
+        # Vérifier que le serveur a démarré avant de continuer
+        if not self.is_server_running():
+            error_msg = "❌ Le serveur n'a pas pu démarrer. Arrêt des tests."
+            print(f"{Colors.colorize(error_msg, Colors.RED + Colors.BOLD)}")
+            return
         
         print(f"\n{Colors.colorize('--- Tests des méthodes HTTP ---', Colors.CYAN + Colors.BOLD)}")
         self.test_basic_http_methods()
